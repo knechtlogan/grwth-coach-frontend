@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — AI Sales Call Coaching</title>
+<meta name="description" content="GRWTH Coach automatically records, transcribes, and scores every sales call — so agents get real coaching feedback on every conversation, not just the ones a manager happens to catch.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal-700: #0B7A70; --teal-600: #0D9488; --teal-500: #14B8A6; --teal-400: #2DD4BF; --teal-100: #E3F5F2;
+    --slate-950: #0E1018; --slate-900: #1A1A2E;
+    --bg: #F4F6F8; --white: #FFFFFF;
+    --ink-900: #12141F; --ink-700: #2E3244; --ink-500: #6B7280; --ink-400: #9098A8;
+    --line: #E4E7EC;
+    --font-display: 'Geist', -apple-system, sans-serif;
+    --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius: 16px;
+    --shadow-card: 0 1px 2px rgba(14,16,24,0.04), 0 12px 28px -14px rgba(14,16,24,0.14);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); font-family: var(--font-body); color: var(--ink-900); -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; color: inherit; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 20px 6vw; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(155deg, var(--teal-400), var(--teal-600)); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; }
+  .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; }
+  .login-btn { background: var(--white); border: 1px solid var(--line); padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-card); }
+
+  .hero { text-align: center; padding: 70px 6vw 50px; max-width: 780px; margin: 0 auto; }
+  .eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; color: var(--teal-600); margin-bottom: 16px; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(32px, 5vw, 52px); line-height: 1.1; letter-spacing: -1px; margin: 0 0 20px; }
+  h1 em { font-style: italic; color: var(--teal-600); }
+  .hero-sub { font-size: 17px; color: var(--ink-500); line-height: 1.6; max-width: 560px; margin: 0 auto 32px; }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff; padding: 13px 28px; border-radius: 999px; font-weight: 700; font-size: 14px; box-shadow: 0 14px 30px -10px rgba(13,148,136,0.5); }
+  .btn-secondary { background: var(--white); border: 1px solid var(--line); color: var(--ink-700); padding: 13px 28px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+
+  .section { max-width: 1000px; margin: 0 auto; padding: 50px 6vw; }
+  .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 30px; }
+  .how-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow-card); }
+  .how-num { font-family: var(--font-display); font-weight: 800; font-size: 13px; color: var(--teal-600); margin-bottom: 10px; }
+  .how-title { font-family: var(--font-display); font-weight: 700; font-size: 17px; margin-bottom: 8px; }
+  .how-desc { font-size: 13.5px; color: var(--ink-500); line-height: 1.6; }
+  @media (max-width: 720px) { .how-grid { grid-template-columns: 1fr; } }
+
+  .footer { text-align: center; padding: 40px 6vw; color: var(--ink-400); font-size: 12.5px; }
+  .footer a { color: var(--teal-600); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <img src="grwth-icon.png" alt="GRWTH Coach" class="brand-mark" style="object-fit:cover;">
+    <div class="brand-name">GRWTH Coach</div>
+  </div>
+  <a href="/login.html" class="login-btn">Log In</a>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">Coach IQ · AI Sales Call Coaching</div>
+  <h1>Every call, <em>coached automatically.</em></h1>
+  <p class="hero-sub">GRWTH Coach automatically joins your sales calls, transcribes the conversation, and scores it against a real sales methodology — so every agent gets real coaching feedback on every call, not just the ones a manager happens to catch.</p>
+  <div class="cta-row">
+    <a href="/login.html" class="btn-primary">Get Started</a>
+    <a href="/privacy-policy.html" class="btn-secondary">Privacy Policy</a>
+  </div>
+</div>
+
+<div class="section">
+  <div class="how-grid">
+    <div class="how-card">
+      <div class="how-num">01</div>
+      <div class="how-title">Connect your calendar</div>
+      <div class="how-desc">Link Google Calendar or Zoom and GRWTH Coach automatically detects your upcoming sales calls — no manual setup for each meeting.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-num">02</div>
+      <div class="how-title">A bot joins and records</div>
+      <div class="how-desc">An AI recording assistant joins your call automatically, transcribes the conversation, and captures the full context of the discussion.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-num">03</div>
+      <div class="how-title">Get a real coaching score</div>
+      <div class="how-desc">Every call is scored against a genuine sales methodology — discovery, objection handling, next steps — with specific, actionable feedback.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  &copy; 2026 GRWTH TECH — <a href="/privacy-policy.html">Privacy Policy</a>
+</div>
+
+</body>
+</html>

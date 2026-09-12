@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Log In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal-700: #0B7A70; --teal-600: #0D9488; --teal-500: #14B8A6; --teal-400: #2DD4BF;
+    --slate-950: #0E1018; --slate-900: #1A1A2E;
+    --bg: #F4F6F8; --white: #FFFFFF;
+    --ink-900: #12141F; --ink-700: #2E3244; --ink-500: #6B7280; --ink-400: #9098A8;
+    --line: #E4E7EC; --rose-600: #D5493A;
+    --font: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: var(--font); color: var(--ink-900); -webkit-font-smoothing: antialiased;
+    background: radial-gradient(circle at 85% -10%, rgba(45,212,191,0.25), transparent 55%), linear-gradient(150deg, var(--slate-900), var(--slate-950));
+    display: flex; align-items: center; justify-content: center; padding: 24px; }
+  a { color: var(--teal-400); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .card { background: var(--white); border-radius: var(--radius); box-shadow: 0 30px 80px -20px rgba(0,0,0,0.5); padding: 36px 34px; width: 380px; max-width: 100%; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
+  .brand-name { font-weight: 700; font-size: 15px; }
+  .brand-sub { font-size: 10px; color: var(--teal-700); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+
+  h1 { font-family: var(--font); font-weight: 700; font-size: 22px; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .subtitle { font-size: 13px; color: var(--ink-500); margin: 0 0 24px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { font-size: 11.5px; font-weight: 700; color: var(--ink-700); display: block; margin-bottom: 5px; }
+  .field input { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; }
+  .field input:focus { outline: none; border-color: var(--teal-500); box-shadow: 0 0 0 3px rgba(20,184,166,0.15); }
+
+  .submit-btn {
+    width: 100%; padding: 13px; border: none; border-radius: 10px; margin-top: 6px;
+    background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff;
+    font-weight: 700; font-size: 14px; box-shadow: 0 10px 24px -10px rgba(13,148,136,0.6);
+  }
+  .submit-btn:disabled { opacity: 0.6; }
+
+  .error-box { background: #FBE6E3; color: var(--rose-600); border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 14px; display: none; }
+  .footer-note { text-align: center; font-size: 12.5px; color: var(--ink-500); margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <img src="grwth-icon.png" alt="GRWTH Coach" class="brand-mark" style="object-fit:cover;">
+    <div>
+      <div class="brand-name">GRWTH Coach</div>
+      <div class="brand-sub">Coach IQ Engine</div>
+    </div>
+  </div>
+
+  <h1>Welcome back</h1>
+  <p class="subtitle">Log in to your GRWTH Coach workspace.</p>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <form id="loginForm">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" required placeholder="jane@example.com">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" required placeholder="Your password">
+    </div>
+
+    <button type="submit" class="submit-btn" id="submitBtn">Log In</button>
+  </form>
+
+  <p class="footer-note">New here? <a href="signup.html">Create an account</a></p>
+</div>
+
+<script>
+  const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('errorBox');
+    const submitBtn = document.getElementById('submitBtn');
+    errorBox.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Logging in…';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grwth-coach/auth/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value.trim(),
+          password: document.getElementById('password').value,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || `Login failed (${res.status})`);
+      }
+
+      localStorage.setItem('grwth_api_base', API_BASE);
+      localStorage.setItem('grwth_advisor_id', data.advisorId);
+      localStorage.setItem('grwth_advisor_name', data.name);
+      localStorage.setItem('grwth_advisor_email', data.email);
+      localStorage.setItem('grwth_advisor_role', data.role);
+      // Real fix — the previous version decoded ?next=<page> and
+      // assigned it straight to window.location.href with zero
+      // validation. A crafted link like
+      // login.html?next=javascript:alert(document.cookie) would
+      // execute arbitrary script immediately after a real, successful
+      // login — running with the victim's own freshly-authenticated
+      // session. This is a genuine, exploitable reflected XSS, not
+      // just an escaping gap; escaping alone can't fix it since the
+      // danger is the value being used as a navigation target, not
+      // rendered as HTML. Now the value is resolved as a URL and only
+      // honored if it's a same-origin http(s) page — anything else
+      // (javascript:, data:, or a different host entirely) is
+      // silently rejected and falls back to the normal dashboard.
+      const nextParam = new URLSearchParams(window.location.search).get('next');
+      let redirectTarget = 'dashboard.html';
+      if (nextParam) {
+        try {
+          const decoded = decodeURIComponent(nextParam);
+          const resolved = new URL(decoded, window.location.origin);
+          if (resolved.origin === window.location.origin && /^https?:$/.test(resolved.protocol)) {
+            redirectTarget = resolved.pathname.replace(/^\//, '') + resolved.search + resolved.hash;
+          }
+        } catch (e) {
+          // malformed next param — fall back to the default dashboard
+        }
+      }
+      window.location.href = redirectTarget;
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Log In';
+    }
+  });
+</script>
+
+</body>
+</html>

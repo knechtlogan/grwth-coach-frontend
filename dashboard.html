@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Dashboard</title>
+<script>
+  (function() {
+    var saved = localStorage.getItem('grwth_theme');
+    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!--
+  =========================================================================
+  GRWTH COACH — MAIN DASHBOARD (v3)
+  Single-file HTML tool. Built to run standalone inside Manus AI, embedded
+  as the primary view of the GRWTH Coach module inside GRWTH Suitability AI.
+
+  BRAND SYSTEM: GRWTH TECH teal/slate.
+    Teal  #0D9488 / #14B8A6 / #0B7A70
+    Slate #1A1A2E (dark base) / #12141F (deepest)
+
+  v3 CHANGES — brought up to the density/weight of the Call Review page,
+  after reviewing 7Q's actual product (app.7q.ai screenshots):
+  - Hero score card now pairs with a real trend chart (their Hub does this)
+  - Added "Coaching Patterns" — cross-call pattern intelligence cards,
+    the single most premium-feeling thing in 7Q's hub. Ours reads calls
+    against the Natural Selling Grading™ categories instead of NEPQ.
+  - Meeting rows now carry a client avatar (initials, deterministic color)
+    instead of just the ring, matching 7Q's use of photos/avatars per call.
+
+  WIRING NOTES FOR MANUS INTEGRATION:
+  - Replace MOCK_MEETINGS / MOCK_PATTERNS / MOCK_TREND below with real
+    calls to your API. Look for `// MANUS:FETCH` markers.
+  - Clicking a meeting row opens a detail drawer — swap the "Open Full
+    Coaching Report" button to link to grwth-coach-call-review.html
+    with the real call id once that's wired to a router.
+  =========================================================================
+-->
+
+<style>
+  :root {
+    --teal-700: #0B7A70;
+    --teal-600: #0D9488;
+    --teal-500: #14B8A6;
+    --teal-400: #2DD4BF;
+    --teal-glow: rgba(13,148,136,0.45);
+    --teal-muted: rgba(13,148,136,0.12);
+
+    --slate-950: #0E1018;
+    --slate-900: #1A1A2E;
+    --slate-800: #252A3D;
+    --slate-700: #363C54;
+
+    --bg: #F4F6F8;
+    --white: #FFFFFF;
+    --ink-900: #12141F;
+    --ink-700: #2E3244;
+    --ink-500: #6B7280;
+    --ink-400: #9098A8;
+    --ink-300: #D1D5DB;
+    --line: #E4E7EC;
+
+    --amber-600: #C08A2E;
+    --amber-100: #FBF1DD;
+    --rose-600: #D5493A;
+    --rose-100: #FBE6E3;
+    --teal-100: #E3F5F2;
+
+    --font-display: 'Geist', -apple-system, sans-serif;
+    --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', 'DM Mono', monospace;
+
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow-card: 0 1px 2px rgba(14,16,24,0.04), 0 12px 28px -14px rgba(14,16,24,0.14);
+    --shadow-glow: 0 0 0 1px rgba(13,148,136,0.25), 0 16px 40px -12px rgba(13,148,136,0.35);
+  }
+
+  /* Real fix — light/dark toggle. Same token names as :root above, so
+     every existing rule that already references var(--bg), var(--white)
+     etc. adapts automatically with zero changes elsewhere in this file.
+     Applied via [data-theme="dark"] on <html>, set before first paint
+     by the blocking script in <head> to avoid a flash of the wrong theme. */
+  html[data-theme="dark"] {
+    --bg: #0B0E17;
+    --white: #121A29;
+    --ink-900: #FFFFFF;
+    --ink-700: #E4E7EC;
+    --ink-500: #9098A8;
+    --ink-400: #6B7280;
+    --ink-300: #363C54;
+    --line: #1D2C42;
+
+    --amber-100: #2E230F;
+    --rose-100: #2E1512;
+    --teal-100: #0E262A;
+
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.5);
+    --shadow-glow: 0 0 0 1px rgba(45,212,191,0.3), 0 16px 40px -12px rgba(45,212,191,0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink-900);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
+
+  button:focus-visible,
+  input:focus-visible,
+  [tabindex]:focus-visible,
+  .meeting-row:focus-visible {
+    outline: 2px solid var(--teal-600);
+    outline-offset: 2px;
+  }
+
+  /* ---------------- Layout shell ---------------- */
+  .app { display: grid; grid-template-columns: 252px 1fr; min-height: 100vh; }
+
+  /* ---------------- Sidebar ---------------- */
+  .sidebar {
+    background: var(--white);
+    color: var(--ink-700);
+    padding: 22px 14px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    border-right: 1px solid var(--line);
+  }
+
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 20px 8px; margin-bottom: 16px; }
+
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(155deg, var(--teal-400), var(--teal-600));
+    box-shadow: 0 4px 12px -4px rgba(13,148,136,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0;
+  }
+
+  .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: -0.2px; color: var(--ink-900); line-height: 1.15; }
+  .brand-sub { font-size: 9.5px; color: var(--teal-600); text-transform: uppercase; letter-spacing: 1.3px; font-weight: 700; margin-top: 2px; }
+
+  .org-card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
+  .org-card-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 3px; }
+  .org-card-name { font-size: 13px; font-weight: 700; color: var(--ink-900); margin-bottom: 6px; }
+  .org-badge { display: inline-block; font-size: 10px; font-weight: 700; color: var(--teal-700); background: var(--teal-100); padding: 2px 8px; border-radius: 999px; }
+
+  .nav-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.1px; font-weight: 700; color: var(--ink-400); padding: 0 12px; margin: 16px 0 7px; }
+  .nav-group-label:first-of-type { margin-top: 0; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 9px;
+    font-size: 13.5px; font-weight: 500; color: var(--ink-500); text-decoration: none;
+    background: transparent; border: none; width: 100%; text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--ink-900); }
+  .nav-item.active { background: var(--teal-100); color: var(--teal-700); font-weight: 700; }
+  .nav-icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
+
+  .sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .avatar-sm {
+    width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(155deg, var(--teal-500), var(--teal-700));
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #06110F; flex-shrink: 0;
+  }
+  .footer-name { font-size: 12.5px; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
+  .footer-role { font-size: 10.5px; color: var(--ink-400); }
+
+  /* ---------------- Main ---------------- */
+  .main { padding: 32px 42px 60px; max-width: 1240px; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+  .topbar-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: var(--teal-600); margin-bottom: 6px; }
+  .topbar h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; letter-spacing: -0.6px; margin: 0; color: var(--ink-900); }
+  .topbar h1 em { font-style: italic; color: var(--teal-600); font-weight: 800; }
+  .topbar-sub { font-size: 13.5px; color: var(--ink-500); margin-top: 4px; }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+  .search-box {
+    display: flex; align-items: center; gap: 8px; background: var(--white); border: 1px solid var(--line);
+    border-radius: 999px; padding: 9px 15px; min-width: 250px; transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .search-box:focus-within { border-color: var(--teal-500); box-shadow: 0 0 0 4px var(--teal-muted); }
+  .search-box svg { width: 15px; height: 15px; color: var(--ink-400); flex-shrink: 0; }
+  .search-box input { border: none; outline: none; font-size: 13.5px; font-family: inherit; width: 100%; background: transparent; color: var(--ink-900); }
+  .search-box input::placeholder { color: var(--ink-300); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #FFFFFF; border: none;
+    padding: 11px 20px; border-radius: 999px; font-size: 13.5px; font-weight: 700;
+    display: flex; align-items: center; gap: 7px; white-space: nowrap;
+    box-shadow: 0 8px 20px -8px rgba(13,148,136,0.65); transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(13,148,136,0.75); }
+  .btn-primary svg { width: 14px; height: 14px; }
+
+  /* ---------------- Hero row: score + trend chart ---------------- */
+  .hero-row { display: grid; grid-template-columns: 340px 1fr; gap: 16px; margin-bottom: 16px; }
+
+  .hero-score-card {
+    background: radial-gradient(circle at 85% -10%, rgba(45,212,191,0.35), transparent 55%), linear-gradient(150deg, var(--slate-900), var(--slate-950));
+    border: 1px solid rgba(45,212,191,0.25);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-glow);
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--teal-400); margin-bottom: 10px; }
+  .hero-score-row { display: flex; align-items: baseline; gap: 10px; }
+  .hero-score { font-family: var(--font-display); font-weight: 700; font-size: 56px; letter-spacing: -1.5px; color: #FFFFFF; line-height: 1; }
+  .hero-score-delta { font-family: var(--font-mono); font-size: 12.5px; color: #B8F1E8; background: rgba(45,212,191,0.14); padding: 4px 9px; border-radius: 999px; }
+  .hero-score-sub { font-size: 12px; color: #9DB0B4; margin-top: 10px; }
+
+  .hero-milestone {
+    margin-top: 18px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-sm); padding: 11px 14px; font-size: 12px; color: #E7EDEF;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hero-milestone strong { color: var(--teal-400); }
+
+  .trend-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 20px 24px 12px; }
+  .trend-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .trend-title { font-family: var(--font-display); font-weight: 700; font-size: 14.5px; color: var(--ink-900); }
+  .trend-sub { font-size: 11.5px; color: var(--ink-400); }
+
+  /* ---------------- Stat strip ---------------- */
+  .stat-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 26px; }
+  .stat-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-card); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -16px rgba(14,16,24,0.18); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--ink-400); margin-bottom: 7px; }
+  .stat-value { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.4px; color: var(--ink-900); line-height: 1; }
+  .stat-delta { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; color: var(--teal-700); margin-top: 7px; }
+  .stat-delta.down { color: var(--rose-600); }
+
+  /* ---------------- Coaching Patterns ---------------- */
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin: 30px 0 14px; }
+  .section-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -0.3px; margin: 0; color: var(--ink-900); }
+  .section-head p { font-size: 12.5px; color: var(--ink-400); margin: 3px 0 0; }
+
+  .coach-spotlight {
+    background: linear-gradient(155deg, var(--slate-900) 0%, #1A1B2E 60%, var(--slate-900) 100%);
+    border-radius: 20px; padding: 30px 32px; margin-bottom: 16px; position: relative; overflow: hidden;
+    box-shadow: 0 24px 50px -20px rgba(14,16,24,0.35);
+  }
+  .coach-spotlight::before {
+    content: ''; position: absolute; top: -40%; right: -10%; width: 340px; height: 340px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(45,212,191,0.18), transparent 70%); pointer-events: none;
+  }
+  .coach-spotlight-eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: var(--teal-400); margin-bottom: 14px; }
+  .coach-spotlight-eyebrow svg { width: 14px; height: 14px; }
+  .coach-spotlight h3 { font-family: var(--font-display); font-weight: 700; font-size: 22px; color: #fff; margin: 0 0 10px; line-height: 1.25; letter-spacing: -0.3px; max-width: 560px; }
+  .coach-spotlight p { font-size: 13.5px; color: rgba(255,255,255,0.72); line-height: 1.6; margin: 0 0 20px; max-width: 520px; }
+  .coach-spotlight-quote { font-size: 12.5px; font-style: italic; color: var(--teal-300, #7DD8CC); border-left: 2px solid var(--teal-400); padding-left: 12px; margin-bottom: 22px; max-width: 500px; }
+  .coach-spotlight-cta { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--teal-400), var(--teal-600)); color: #06110F; text-decoration: none; padding: 11px 22px; border-radius: 999px; font-weight: 700; font-size: 13px; box-shadow: 0 12px 24px -10px rgba(45,212,191,0.5); }
+  .coach-spotlight-cta svg { width: 14px; height: 14px; }
+  .coach-spotlight-freq { position: absolute; top: 30px; right: 32px; text-align: right; }
+  .coach-spotlight-freq .num { font-family: var(--font-display); font-weight: 800; font-size: 34px; color: #fff; line-height: 1; }
+  .coach-spotlight-freq .label { font-size: 10.5px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }
+
+  .pattern-list { display: flex; flex-direction: column; gap: 8px; }
+  .pattern-row {
+    background: var(--white); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 18px; display: flex; align-items: center; gap: 14px;
+    text-decoration: none; color: inherit; transition: border-color 0.15s, transform 0.15s;
+  }
+  .pattern-row:hover { border-color: var(--teal-400); transform: translateX(2px); }
+  .pattern-row-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pattern-row.risk .pattern-row-dot { background: var(--rose-600); }
+  .pattern-row.watch .pattern-row-dot { background: var(--amber-600); }
+  .pattern-row.strength .pattern-row-dot { background: var(--teal-500); }
+  .pattern-row-body { flex: 1; min-width: 0; }
+  .pattern-row-name { font-size: 13.5px; font-weight: 700; color: var(--ink-900); margin-bottom: 2px; }
+  .pattern-row-desc { font-size: 12px; color: var(--ink-500); line-height: 1.4; }
+  .pattern-row-freq { font-family: var(--font-mono); font-size: 11px; color: var(--ink-400); white-space: nowrap; flex-shrink: 0; }
+  .pattern-row-arrow { width: 15px; height: 15px; color: var(--ink-300); flex-shrink: 0; transition: transform 0.15s, color 0.15s; }
+  .pattern-row:hover .pattern-row-arrow { color: var(--teal-600); transform: translateX(2px); }
+  .pattern-empty { text-align: center; padding: 40px 20px; color: var(--ink-400); font-size: 13px; }
+
+  /* ---------------- Filter bar ---------------- */
+  .filter-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+  .tab-group { display: flex; gap: 4px; background: var(--white); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+  .tab-btn { border: none; background: transparent; padding: 8px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--ink-400); transition: all 0.15s ease; }
+  .tab-btn.active { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #FFFFFF; }
+
+  .filter-right { display: flex; align-items: center; gap: 10px; }
+  .sort-select { font-family: inherit; font-size: 12.5px; font-weight: 500; color: var(--ink-700); background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 13px; }
+
+  .view-toggle { display: flex; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+  .view-toggle button { border: none; background: transparent; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--ink-400); }
+  .view-toggle button.active { background: var(--teal-muted); color: var(--teal-700); }
+  .view-toggle svg { width: 15px; height: 15px; }
+
+  /* ---------------- Meeting list ---------------- */
+  .meeting-list { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); overflow: hidden; }
+
+  .meeting-row {
+    display: grid; grid-template-columns: 42px 58px 1.5fr 1fr auto; align-items: center; gap: 16px;
+    padding: 15px 22px; border-bottom: 1px solid var(--line); background: none;
+    border-left: 3px solid transparent; border-right: none; border-top: none;
+    width: 100%; text-align: left; transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  .meeting-row:last-child { border-bottom: none; }
+  .meeting-row:hover { background: var(--teal-muted); border-left-color: var(--teal-500); }
+
+  .row-avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 12.5px; color: #FFFFFF;
+  }
+
+  .meeting-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .meeting-client { font-size: 14.5px; font-weight: 700; color: var(--ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meeting-meta { font-size: 12px; color: var(--ink-500); display: flex; align-items: center; gap: 8px; }
+
+  .platform-tag {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--teal-700);
+    background: var(--teal-100); border: 1px solid rgba(13,148,136,0.18); padding: 3px 9px; border-radius: 999px;
+  }
+
+  .grade-chips { display: flex; flex-wrap: wrap; gap: 5px; max-width: 260px; }
+  .chip { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 6px; letter-spacing: 0.3px; }
+  .chip.grade-A { background: var(--teal-100); color: var(--teal-700); }
+  .chip.grade-B { background: var(--amber-100); color: var(--amber-600); }
+  .chip.grade-C { background: var(--rose-100); color: var(--rose-600); }
+
+  .row-right { display: flex; align-items: center; gap: 20px; }
+  .status-pill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 11px; border-radius: 999px; }
+  .status-pill.ready { background: var(--teal-100); color: var(--teal-700); }
+  .status-pill.processing { background: var(--amber-100); color: var(--amber-600); }
+  .chevron { width: 16px; height: 16px; color: var(--ink-300); flex-shrink: 0; }
+
+  /* ---------------- Coach IQ ring ---------------- */
+  .ring-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-score { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--ink-900); }
+  .ring-wrap.large { width: 112px; height: 112px; }
+  .ring-wrap.large .ring-score { font-size: 32px; }
+
+  /* ---------------- Empty state ---------------- */
+  .empty-state { padding: 70px 20px; text-align: center; color: var(--ink-400); }
+  .empty-state .glyph { font-family: var(--font-display); font-size: 30px; color: var(--teal-500); margin-bottom: 10px; font-weight: 700; }
+  .empty-state h3 { font-family: var(--font-display); color: var(--ink-900); margin: 0 0 6px; font-weight: 700; }
+  .empty-state p { font-size: 13px; margin: 0; }
+
+  /* ---------------- Drawer ---------------- */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(14,16,24,0.5); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 50; }
+  .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100vh; width: 430px; max-width: 92vw; background: var(--bg);
+    box-shadow: -16px 0 48px rgba(14,16,24,0.22); transform: translateX(100%); transition: transform 0.25s ease;
+    z-index: 51; padding: 26px 26px 30px; overflow-y: auto;
+  }
+  .drawer.open { transform: translateX(0); }
+
+  .drawer-close { background: var(--white); border: 1px solid var(--line); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+  .drawer-close svg { width: 14px; height: 14px; color: var(--ink-700); }
+
+  .drawer-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .drawer-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 21px; color: var(--ink-900); margin: 0 0 4px; letter-spacing: -0.3px; }
+  .drawer-head p { font-size: 12.5px; color: var(--ink-500); margin: 0; }
+
+  .drawer-section { margin-top: 24px; }
+  .drawer-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px; font-weight: 700; color: var(--ink-400); margin: 0 0 10px; }
+
+  .drawer-grade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .drawer-grade-row { display: flex; align-items: center; justify-content: space-between; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; font-weight: 500; }
+  .drawer-grade-row span:first-child { color: var(--ink-700); }
+
+  .drawer-note { background: var(--white); border: 1px solid var(--line); border-left: 3px solid var(--teal-500); border-radius: var(--radius-sm); padding: 13px 15px; font-size: 12.5px; color: var(--ink-700); line-height: 1.55; }
+
+  .drawer-cta { margin-top: 26px; width: 100%; background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #FFFFFF; border: none; padding: 13px; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 700; box-shadow: 0 10px 24px -10px rgba(13,148,136,0.7); }
+
+  /* ---------------- Responsive ---------------- */
+  @media (max-width: 1050px) {
+    .hero-row { grid-template-columns: 1fr; }
+    .pattern-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; flex-direction: row; align-items: center; padding: 14px 16px; overflow-x: auto; }
+    .brand { border: none; padding: 0; margin: 0 16px 0 0; }
+    .nav-group-label { display: none; }
+    .sidebar-footer { display: none; }
+    .sidebar > div:not(.brand) { display: flex; gap: 4px; }
+    .main { padding: 22px 16px 50px; }
+    .stat-strip { grid-template-columns: 1fr 1fr; }
+    .meeting-row { grid-template-columns: 32px 44px 1fr auto; }
+    .grade-chips { display: none; }
+    .topbar { flex-direction: column; align-items: flex-start; }
+    .search-box { min-width: 0; width: 100%; }
+    .topbar-actions { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="viewAsBanner" style="display:none;position:sticky;top:0;z-index:200;background:linear-gradient(90deg,#1A1B2E,#0E1018);color:#fff;padding:10px 24px;font-size:12.5px;font-weight:600;display:none;align-items:center;justify-content:center;gap:10px;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14" style="color:#2DD4BF;"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+  <span>Viewing as <strong id="viewAsName">—</strong> — this is exactly what they see.</span>
+  <button id="exitViewAsBtn" style="background:rgba(255,255,255,0.12);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;margin-left:6px;">Exit Preview</button>
+</div>
+
+<script>
+(function() {
+  // Real fix — the "view as" shim must run before ANY other script on
+  // the page reads the advisor ID, so it patches localStorage.getItem
+  // itself rather than requiring every page's fetch logic to be touched
+  // individually.
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  if (viewingAsId) {
+    var originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === 'grwth_advisor_id') return viewingAsId;
+      return originalGetItem.call(this, key);
+    };
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var apiBase = window.GRWTH_API_BASE || Storage.prototype.getItem.call(localStorage, 'grwth_api_base') || 'https://api.grwthtech.com';
+  var realAdvisorId = Storage.prototype.getItem.call(localStorage, 'grwth_advisor_id');
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  var viewingAsName = sessionStorage.getItem('grwth_viewing_as_name');
+
+  if (viewingAsId && viewingAsName) {
+    document.getElementById('viewAsName').textContent = viewingAsName;
+    document.getElementById('viewAsBanner').style.display = 'flex';
+  }
+
+  document.getElementById('exitViewAsBtn').addEventListener('click', function() {
+    sessionStorage.removeItem('grwth_viewing_as_id');
+    sessionStorage.removeItem('grwth_viewing_as_name');
+    window.location.reload();
+  });
+
+  // Real fix — the "View As" button itself now lives only on
+  // Settings, per Logan's requirement. The shim above and this banner
+  // still apply on every page so browsing the rest of the app while
+  // viewing as someone else keeps working correctly.
+});
+</script>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="grwth-icon.png" alt="GRWTH Coach" class="brand-mark" style="object-fit:cover;">
+      <div>
+        <div class="brand-name">GRWTH Coach</div>
+        <div class="brand-sub">Coach IQ Engine</div>
+      </div>
+    </div>
+
+    <div class="org-card">
+      <div class="org-card-label">Organization</div>
+      <div class="org-card-name" id="sidebarOrgName">Loading…</div>
+      <span class="org-badge" id="sidebarOrgBadge">—</span>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Overview</div>
+      <a href="dashboard.html" class="nav-item active" id="navDashboard">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a href="meetings.html" class="nav-item" id="navMeetings">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 10l4.55-2.3a1 1 0 0 1 1.45.9v6.8a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg>
+        Meetings
+      </a>
+      <a href="coaching-reports.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5a1 1 0 0 0 1 1h5"/><path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 13h6M9 17h4"/></svg>
+        Coaching Reports
+      </a>
+      <a href="analytics.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l3-3 4 4 5-6 6 6"/><path d="M3 19h18"/></svg>
+        Analytics
+      </a>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Team</div>
+      <a href="team-performance.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 12.2a5.2 5.2 0 0 1 6.5 5"/></svg>
+        Team Performance
+      </a>
+      <a href="training-library.html" class="nav-item" id="navTrainingLibrary">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V6a2 2 0 0 1 2-2h9l5 5v10.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M8 12h8M8 16h5"/></svg>
+        Training Library
+      </a>
+      <a href="natural-selling-vault.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+        Natural Selling Vault
+      </a>
+      <a href="roleplay.html" class="nav-item" id="navRoleplay" style="position:relative;">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+        Role-Play
+        <span id="roleplayReadyDot" style="display:none;width:7px;height:7px;border-radius:50%;background:#14B8A6;box-shadow:0 0 0 3px rgba(20,184,166,0.25);margin-left:auto;flex-shrink:0;"></span>
+      </a>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Account</div>
+      <a href="settings.html" class="nav-item" id="navSettings">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.96a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6c.61.26 1.34.16 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.26.61.85 1.04 1.56 1.04H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/></svg>
+        Settings
+      </a>
+      <a href="ask-grwth.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        Ask GRWTH
+      </a>
+    </div>
+
+    <div id="superAdminNavGroup" style="display:none;">
+      <div class="nav-group-label">System</div>
+      <a href="super-admin.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/></svg>
+        Super Admin
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="avatar-sm" id="sidebarAvatar">LK</div>
+      <div>
+        <div class="footer-name" id="sidebarFooterName">Logan Knecht</div>
+        <div class="footer-role" id="sidebarFooterRole">Agency Owner</div>
+      </div>
+    </div>
+  </aside>
+<script>
+  // Populate the sidebar identity block with whoever's actually logged in —
+  // this used to be hardcoded to one person regardless of who signed in.
+  (function () {
+    const name = localStorage.getItem('grwth_advisor_name');
+    const role = localStorage.getItem('grwth_advisor_role');
+    const nameEl = document.getElementById('sidebarFooterName');
+    const roleEl = document.getElementById('sidebarFooterRole');
+    const avatarEl = document.getElementById('sidebarAvatar');
+    const roleLabel = role === 'agency_owner' ? 'Agency Owner' : role === 'admin' ? 'Admin' : 'Agent';
+    if (name && nameEl) nameEl.textContent = name;
+    if (role && roleEl) roleEl.textContent = roleLabel;
+    if (name && avatarEl) {
+      avatarEl.textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    }
+    const cachedPhoto = localStorage.getItem('grwth_advisor_photo');
+    if (cachedPhoto && avatarEl) {
+      avatarEl.style.backgroundImage = `url(${cachedPhoto})`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.textContent = '';
+    }
+    const orgNameEl = document.getElementById('sidebarOrgName');
+    const orgBadgeEl = document.getElementById('sidebarOrgBadge');
+    if (orgBadgeEl) orgBadgeEl.textContent = roleLabel;
+    if (orgNameEl) orgNameEl.textContent = 'GRWTH TECH';
+
+    // Fetch the REAL organization name (and confirm role label) from the
+    // API — the agency owner can rename their organization, and every
+    // team member should see that real name, not just whatever was
+    // cached at their own last login.
+    const orgApiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+    const orgAdvisorId = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+    if (orgAdvisorId && orgNameEl) {
+      fetch(`${orgApiBase}/api/grwth-coach/me`, { credentials: 'include', headers: { 'x-advisor-id': orgAdvisorId } })
+        .then(r => r.json())
+        .then(me => {
+          orgNameEl.textContent = me.teamName || 'GRWTH TECH';
+          if (orgBadgeEl && me.roleLabel) orgBadgeEl.textContent = me.roleLabel;
+          if (me.photoUrl && avatarEl) {
+            avatarEl.style.backgroundImage = `url(${me.photoUrl})`;
+            avatarEl.style.backgroundSize = 'cover';
+            avatarEl.style.backgroundPosition = 'center';
+            avatarEl.textContent = '';
+            localStorage.setItem('grwth_advisor_photo', me.photoUrl);
+          } else if (avatarEl) {
+            avatarEl.style.backgroundImage = '';
+            localStorage.removeItem('grwth_advisor_photo');
+          }
+          if (me.onboarding && typeof renderOnboarding === 'function') renderOnboarding(me.onboarding);
+        })
+        .catch(() => {});
+    }
+  })();
+
+  // Real Logout — previously there was no way to switch accounts without
+  // manually clearing browser storage.
+  (function () {
+    const footer = document.querySelector('.sidebar-footer');
+    if (!footer) return;
+
+    // Real fix — theme toggle moved here, between the agent's name and
+    // the logout button, per Logan's request. Uses var(--ink-500),
+    // which is already theme-aware, instead of the logout button's old
+    // hardcoded near-white color that was invisible against the
+    // sidebar's light background in light mode.
+    const themeBtn = document.createElement('button');
+    themeBtn.id = 'themeToggleBtn';
+    themeBtn.title = 'Toggle dark mode';
+    themeBtn.style.cssText = 'margin-left:auto;border:1px solid var(--line);background:var(--bg);color:var(--ink-700);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;';
+    themeBtn.innerHTML =
+      '<svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' +
+      '<svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="display:none;"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>';
+    // Real, live onboarding checklist — computed from actual account state
+// (not a one-time flag), so it stays accurate and reappears if someone
+// disconnects an integration later. Steps: photo, calendar, Zoom, bot
+// name customization, and visiting Settings at least once.
+// Real, first-time guided tour — a genuine spotlight overlay walking
+// new users through the app's key pieces, one real element at a time.
+// Auto-runs once for a brand-new account (tracked in localStorage, same
+// pattern as the onboarding checklist dismiss), and can be re-triggered
+// any time via the "?" help icon in the sidebar footer.
+const TOUR_STEPS = [
+  { selector: '#navDashboard', title: 'Your Dashboard', text: "This is home base — your Coach IQ score, weekly trend, and what your coach wants you focusing on next, all in one place." },
+  { selector: '#newRecordingBtn', title: 'Start a Recording', text: "Connect your Zoom/Google/Outlook calendar in Settings and GRWTH Coach auto-joins your calls — no manual recording needed. This button is for a one-off manual session." },
+  { selector: '#tourHeroScore', title: 'Coach IQ Score', text: "Your rolling average across recent calls. Every scored call moves this number — it's the single best signal of how you're trending." },
+  { selector: '#navMeetings', title: 'Meetings', text: "Every past call lives here, scored and ready to review — plus any upcoming calls on your connected calendar." },
+  { selector: '#navTrainingLibrary', title: 'Training Library', text: "Your best moments — and your team's — automatically clipped from real calls when something's done really well. Great for onboarding new agents." },
+  { selector: '#navRoleplay', title: 'Role-Play', text: "Practice against an AI voice partner on your actual weak spots, identified straight from your own real coaching patterns." },
+  { selector: '#navSettings', title: 'Settings', text: "Connect your calendar and Zoom account here, upload a photo, and customize your coach bot's name — this is the one page worth setting up first." },
+];
+let tourStepIndex = 0;
+
+function tourElementIsVisible(el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function renderTourStep() {
+  // Skip any step whose target isn't currently visible (e.g. a hidden
+  // nav item) rather than showing a spotlight around nothing.
+  while (tourStepIndex < TOUR_STEPS.length && !tourElementIsVisible(document.querySelector(TOUR_STEPS[tourStepIndex].selector))) {
+    tourStepIndex++;
+  }
+  if (tourStepIndex >= TOUR_STEPS.length) { endTour(); return; }
+
+  const step = TOUR_STEPS[tourStepIndex];
+  const target = document.querySelector(step.selector);
+  const rect = target.getBoundingClientRect();
+  const pad = 8;
+
+  target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+  let overlay = document.getElementById('tourOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'tourOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;pointer-events:none;';
+    document.body.appendChild(overlay);
+  }
+
+  const holeTop = rect.top - pad;
+  const holeLeft = rect.left - pad;
+  const holeW = rect.width + pad * 2;
+  const holeH = rect.height + pad * 2;
+
+  overlay.innerHTML = `
+    <div style="position:absolute;top:${holeTop}px;left:${holeLeft}px;width:${holeW}px;height:${holeH}px;border-radius:12px;box-shadow:0 0 0 9999px rgba(11,14,23,0.72);pointer-events:none;transition:all .3s;"></div>
+    <div id="tourCard" style="position:absolute;top:${holeTop + holeH + 14}px;left:${Math.max(16, Math.min(holeLeft, window.innerWidth - 336))}px;width:320px;background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:0 20px 50px -12px rgba(0,0,0,0.4);pointer-events:auto;">
+      <div style="font-size:11px;font-weight:700;color:var(--teal-600);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Step ${tourStepIndex + 1} of ${TOUR_STEPS.length}</div>
+      <div style="font-family:var(--font-display);font-weight:800;font-size:15.5px;color:var(--ink-900);margin-bottom:6px;">${step.title}</div>
+      <div style="font-size:13px;color:var(--ink-500);line-height:1.5;margin-bottom:16px;">${step.text}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <button id="tourSkipBtn" style="background:none;border:none;color:var(--ink-400);font-size:12px;font-weight:600;cursor:pointer;padding:4px;">Skip tour</button>
+        <div style="display:flex;gap:8px;">
+          ${tourStepIndex > 0 ? '<button id="tourBackBtn" style="background:var(--bg);border:1px solid var(--line);color:var(--ink-700);font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:8px;cursor:pointer;">Back</button>' : ''}
+          <button id="tourNextBtn" style="background:var(--teal-600);border:none;color:#fff;font-size:12.5px;font-weight:700;padding:7px 16px;border-radius:8px;cursor:pointer;">${tourStepIndex === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('tourNextBtn').addEventListener('click', () => { tourStepIndex++; renderTourStep(); });
+  const backBtn = document.getElementById('tourBackBtn');
+  if (backBtn) backBtn.addEventListener('click', () => { tourStepIndex--; renderTourStep(); });
+  document.getElementById('tourSkipBtn').addEventListener('click', endTour);
+}
+
+function startTour() {
+  tourStepIndex = 0;
+  renderTourStep();
+}
+
+function endTour() {
+  const overlay = document.getElementById('tourOverlay');
+  if (overlay) overlay.remove();
+  localStorage.setItem('grwth_tour_completed', '1');
+}
+
+// Auto-start once, for a brand-new account only — never re-shown
+// automatically after that, only via the manual re-trigger below.
+if (localStorage.getItem('grwth_tour_completed') !== '1') {
+  setTimeout(startTour, 900);
+}
+
+function renderOnboarding(status) {
+  const card = document.getElementById('onboardingCard');
+  if (localStorage.getItem('grwth_onboarding_dismissed') === '1') { card.style.display = 'none'; return; }
+
+  const steps = [
+    { key: 'photoUploaded', label: 'Upload your profile photo', href: 'settings.html' },
+    { key: 'calendarConnected', label: 'Connect your calendar', href: 'settings.html' },
+    { key: 'zoomConnected', label: 'Connect your Zoom account', href: 'settings.html' },
+    { key: 'botNameCustomized', label: 'Name your coach bot for meetings', href: 'settings.html' },
+    { key: 'settingsVisited', label: 'Take a look through Settings', href: 'settings.html' },
+  ];
+  const settingsVisited = localStorage.getItem('grwth_settings_visited') === '1';
+  const fullStatus = { ...status, settingsVisited };
+  const doneCount = steps.filter(s => fullStatus[s.key]).length;
+
+  if (doneCount === steps.length) { card.style.display = 'none'; return; }
+
+  card.style.display = 'block';
+  document.getElementById('onboardingCount').textContent = `${doneCount}/${steps.length}`;
+  document.getElementById('onboardingBar').style.width = `${Math.round((doneCount / steps.length) * 100)}%`;
+  document.getElementById('onboardingSteps').innerHTML = steps.map(s => {
+    const done = !!fullStatus[s.key];
+    return `
+      <a href="${s.href}" style="display:flex;align-items:center;gap:10px;padding:8px 4px;text-decoration:none;border-radius:8px;">
+        <div style="width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${done ? 'var(--teal-600)' : 'var(--bg)'};border:1.5px solid ${done ? 'var(--teal-600)' : 'var(--ink-300)'};">
+          ${done ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="11" height="11"><path d="M20 6 9 17l-5-5"/></svg>' : ''}
+        </div>
+        <span style="font-size:13px;font-weight:600;color:${done ? 'var(--ink-400)' : 'var(--ink-900)'};text-decoration:${done ? 'line-through' : 'none'};">${s.label}</span>
+      </a>`;
+  }).join('');
+}
+// Real fix — this used to run before the onboardingDismissBtn element
+// even existed in the DOM yet (it's defined further down in the page's
+// HTML, after this script block), so getElementById returned null and
+// .addEventListener threw immediately — silently halting every single
+// line of code after it in this same script block, including the
+// theme toggle and logout button setup. Deferred with a null-safe
+// check so a missing element here can never break anything else again.
+const onboardingDismissBtnEl = document.getElementById('onboardingDismissBtn');
+if (onboardingDismissBtnEl) {
+  onboardingDismissBtnEl.addEventListener('click', () => {
+    localStorage.setItem('grwth_onboarding_dismissed', '1');
+    document.getElementById('onboardingCard').style.display = 'none';
+  });
+}
+
+function applyThemeIcon() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.getElementById('themeIconSun').style.display = isDark ? 'none' : 'block';
+      document.getElementById('themeIconMoon').style.display = isDark ? 'block' : 'none';
+    }
+    themeBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('grwth_theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('grwth_theme', 'dark');
+      }
+      applyThemeIcon();
+    });
+
+    const logoutBtn = document.createElement('button');
+    logoutBtn.textContent = 'Log Out';
+    logoutBtn.style.cssText = 'background:none;border:none;color:var(--ink-500);font-size:11px;font-weight:600;cursor:pointer;padding:4px 8px;font-family:inherit;';
+    logoutBtn.addEventListener('mouseenter', () => { logoutBtn.style.color = '#2DD4BF'; });
+    logoutBtn.addEventListener('mouseleave', () => { logoutBtn.style.color = 'var(--ink-500)'; });
+    logoutBtn.addEventListener('click', async () => {
+      // Real fix — actually calls the server to clear the real session
+      // cookie, not just clearing localStorage (which never secured
+      // anything in the first place, and left the real cookie valid).
+      try {
+        await fetch(`${API_BASE}/api/grwth-coach/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (err) {
+        console.warn('[GRWTH Coach] Logout request failed:', err.message);
+      }
+      localStorage.removeItem('grwth_advisor_id');
+      localStorage.removeItem('grwth_advisor_name');
+      localStorage.removeItem('grwth_advisor_email');
+      localStorage.removeItem('grwth_advisor_role');
+      window.location.href = 'login.html';
+    });
+    const helpBtn = document.createElement('button');
+    helpBtn.id = 'tourReplayBtn';
+    helpBtn.title = 'Replay the guided tour';
+    helpBtn.style.cssText = 'border:1px solid var(--line);background:var(--bg);color:var(--ink-700);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;font-weight:800;font-size:13px;';
+    helpBtn.textContent = '?';
+    helpBtn.addEventListener('click', () => { if (typeof startTour === 'function') startTour(); });
+
+    footer.style.display = 'flex';
+    footer.style.alignItems = 'center';
+    footer.appendChild(helpBtn);
+    footer.appendChild(themeBtn);
+    footer.appendChild(logoutBtn);
+    applyThemeIcon();
+  })();
+</script>
+
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <div class="topbar">
+      <div>
+        <div class="topbar-eyebrow">Coach IQ · Live</div>
+        <h1>Every call, <em>coached automatically.</em></h1>
+        <div class="topbar-sub">Your live coaching dashboard — no manual review needed.</div>
+      </div>
+      <div class="topbar-actions">
+        <div class="dash-type-tabs" style="display:flex;gap:6px;background:var(--bg);border-radius:999px;padding:4px;margin-right:6px;">
+          <button class="dash-type-tab active" data-type="sales" style="border:none;background:var(--white);color:var(--ink-900);font-size:12.5px;font-weight:700;padding:7px 16px;border-radius:999px;cursor:pointer;box-shadow:0 1px 3px rgba(14,16,24,0.08);">Client</button>
+          <button class="dash-type-tab" data-type="recruiting" style="border:none;background:transparent;color:var(--ink-500);font-size:12.5px;font-weight:700;padding:7px 16px;border-radius:999px;cursor:pointer;">Recruiting</button>
+        </div>
+        <button class="btn-primary" id="newRecordingBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+          New Recording
+        </button>
+      </div>
+    </div>
+
+    <!-- NEW RECORDING INFO MODAL -->
+    <div id="newRecordingModalOverlay" style="position:fixed;inset:0;background:rgba(14,16,24,0.5);display:none;align-items:center;justify-content:center;z-index:60;">
+      <div style="background:var(--white);border-radius:var(--radius);padding:26px 28px;width:400px;max-width:90vw;box-shadow:0 30px 70px -20px rgba(14,16,24,0.4);text-align:center;">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--teal-100);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2" width="20" height="20"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+        </div>
+        <div style="font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:8px;">Recording starts from the GRWTH Coach extension</div>
+        <p style="font-size:13px;color:var(--ink-500);line-height:1.6;margin:0 0 18px;">
+          Open the GRWTH Coach Chrome extension while you're in a Zoom, Google Meet, or Teams call and click <strong>Send Recall Bot to This Meeting</strong> — the recording, transcript, and scoring will all show up here automatically once the call ends.
+        </p>
+        <a href="https://chromewebstore.google.com/detail/grwth-coach/bgpcbmncokodehklkbdfcgalhbpjocll" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;text-decoration:none;padding:11px;border-radius:8px;font-size:13px;font-weight:700;box-sizing:border-box;margin-bottom:10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Install the Extension
+        </a>
+        <button id="closeNewRecordingModal" style="width:100%;background:transparent;color:var(--ink-500);border:none;padding:8px;font-size:12.5px;font-weight:600;cursor:pointer;">Got it</button>
+      </div>
+    </div>
+
+    <!-- HERO: score + trend chart -->
+    <div class="hero-row">
+      <div class="hero-score-card" id="tourHeroScore">
+        <div>
+          <div class="hero-label">Avg Coach IQ · 30 days</div>
+          <div class="hero-score-row">
+            <div class="hero-score" id="heroScoreValue">—</div>
+          </div>
+          <div class="hero-score-sub">Based on <span id="heroCallCount">—</span> calls analyzed</div>
+        </div>
+      </div>
+
+      <div class="trend-card">
+        <div class="trend-card-head">
+          <div>
+            <div class="trend-title">Coach IQ Trend</div>
+            <div class="trend-sub">Weekly average · last 9 weeks</div>
+          </div>
+        </div>
+        <div id="trendChart"></div>
+      </div>
+    </div>
+
+    <!-- WEEKLY TRAINING HOMEWORK — real server-tracked assignment, not
+         a local flag, so it survives across devices and lets admins see
+         real completion on Team Performance. -->
+    <div id="homeworkCard" style="display:none;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:20px;box-shadow:var(--shadow-card);"></div>
+
+    <!-- PRO TIP — real, data-driven, pulled from the advisor's own
+         weakest actual pattern for whichever call type is active. Not
+         static copy; genuinely changes as their real coaching data does. -->
+    <div id="onboardingCard" style="display:none;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:20px;box-shadow:var(--shadow-card);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--ink-900);">Get your account fully set up</div>
+          <div style="font-size:12.5px;color:var(--ink-500);margin-top:2px;">A few quick steps so nothing falls through the cracks — <span id="onboardingCount">0/5</span> done</div>
+        </div>
+        <button id="onboardingDismissBtn" title="Hide this" style="background:none;border:none;color:var(--ink-400);cursor:pointer;padding:4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="height:6px;background:var(--bg);border-radius:999px;overflow:hidden;margin-bottom:16px;">
+        <div id="onboardingBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal-400),var(--teal-600));border-radius:999px;transition:width .3s;"></div>
+      </div>
+      <div id="onboardingSteps" style="display:flex;flex-direction:column;gap:2px;"></div>
+    </div>
+
+    <div id="proTipCard" style="display:none;background:linear-gradient(135deg, #0B7A70, #063D38);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;color:#fff;display:flex;align-items:center;gap:16px;box-shadow:0 8px 24px -8px rgba(11,122,112,0.5);">
+      <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;opacity:0.8;margin-bottom:2px;" id="proTipLabel">Pro Tip</div>
+        <div style="font-size:14.5px;font-weight:600;line-height:1.4;" id="proTipText"></div>
+      </div>
+    </div>
+
+    <!-- STAT STRIP -->
+    <div class="stat-strip">
+      <div class="stat-card">
+        <div class="stat-label">Meetings This Week</div>
+        <div class="stat-value" id="statMeetings">—</div>
+        <div class="stat-delta" id="statMeetingsDelta">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Talk-to-Listen</div>
+        <div class="stat-value" id="statTalkListen">—</div>
+        <div class="stat-delta" id="statTalkListenDelta">—</div>
+      </div>
+      <a href="meetings.html?tab=past" class="stat-card" style="text-decoration:none;color:inherit;display:block;cursor:pointer;">
+        <div class="stat-label">Needs Review</div>
+        <div class="stat-value" id="statReview">—</div>
+        <div class="stat-delta down">Objection Reframes trending low</div>
+      </a>
+    </div>
+
+    <!-- COACHING PATTERNS -->
+    <div class="section-head">
+      <div>
+        <h2>Your Coach's Take</h2>
+        <p>What's showing up across your <span id="patternCallCount">recent</span> calls — and where to focus next.</p>
+      </div>
+    </div>
+    <div id="patternSpotlight"></div>
+    <div class="pattern-list" id="patternGrid"></div>
+
+  </main>
+</div>
+
+</div>
+
+<script>
+/* =========================================================================
+   MOCK DATA — replace with real calls to your API.
+   MANUS:FETCH  ->  GET /api/grwth-coach/meetings?range=30d
+   MANUS:FETCH  ->  GET /api/grwth-coach/patterns?range=30d
+   MANUS:FETCH  ->  GET /api/grwth-coach/trend?weeks=9
+   ========================================================================= */
+const CATEGORY_LABELS = {
+  fnd: 'Foundations', ct: 'Connecting & Tone', sit: 'Situation Questions', pa: 'Problem Awareness',
+  cq: 'Consequence Questions', sc: 'Solution & Commitment', obj: 'Objection Reframes', lct: 'Live Call Teardown'
+};
+
+const MOCK_MEETINGS = [
+  { id: 1, client: 'Robert & Diane Hutchins', platform: 'Zoom', date: '2026-07-14', time: '9:30 AM', duration: '38 min', score: 91, status: 'ready',
+    grades: { fnd:'A', ct:'A', sit:'A', pa:'B', cq:'A', sc:'A', obj:'B', lct:'A' },
+    note: 'Strong consequence-stage questioning surfaced a real fear around outliving savings — used it well heading into the solution. Objection reframe on fees felt slightly rehearsed; loosen it up next time.' },
+  { id: 2, client: 'Marta Delgado', platform: 'Teams', date: '2026-07-14', time: '11:00 AM', duration: '29 min', score: 74, status: 'ready',
+    grades: { fnd:'B', ct:'A', sit:'B', pa:'C', cq:'B', sc:'B', obj:'C', lct:'B' },
+    note: 'Warm rapport early, but problem awareness stayed surface-level — client named a concern but was never asked to size the cost of inaction. Revisit the vault module on consequence stacking.' },
+  { id: 3, client: 'James Okafor', platform: 'Zoom', date: '2026-07-13', time: '2:15 PM', duration: '21 min', score: 62, status: 'ready',
+    grades: { fnd:'B', ct:'B', sit:'C', pa:'C', cq:'C', sc:'B', obj:'D', lct:'C' },
+    note: 'Objection on "I need to think about it" was answered with a feature dump instead of a reframe question. Good save opportunity for next call — reopen with curiosity, not more information.' },
+  { id: 4, client: 'Priya & Anil Shah', platform: 'Google Meet', date: '2026-07-12', time: '4:00 PM', duration: '44 min', score: 88, status: 'ready',
+    grades: { fnd:'A', ct:'A', sit:'A', pa:'A', cq:'B', sc:'A', obj:'A', lct:'B' },
+    note: 'One of the cleanest Three-Bucket presentations this month. Client-led close — barely needed a commitment question.' },
+  { id: 5, client: 'Frank Lombardi', platform: 'WAVV', date: '2026-07-11', time: '10:45 AM', duration: '33 min', score: 69, status: 'ready',
+    grades: { fnd:'B', ct:'B', sit:'B', pa:'B', cq:'C', sc:'C', obj:'C', lct:'B' },
+    note: 'Talk-to-listen ratio ran 71/29 — longest monologue was 4m 40s during the solution walk-through. Try chunking the explanation with a check-in question every 90 seconds.' },
+  { id: 6, client: 'Yuki Tanaka', platform: 'Zoom', date: '2026-07-10', time: '1:30 PM', duration: '—', score: null, status: 'processing',
+    grades: {}, note: '' },
+  { id: 7, client: 'Carla Jimenez', platform: 'LeadConnector', date: '2026-07-09', time: '3:20 PM', duration: '26 min', score: 95, status: 'ready',
+    grades: { fnd:'A', ct:'A', sit:'A', pa:'A', cq:'A', sc:'A', obj:'A', lct:'A' },
+    note: 'Textbook call — save this one for the training library. Every category graded A, including a genuinely elegant objection reframe on liquidity.' },
+  { id: 8, client: 'Dennis Whitfield', platform: 'Teams', date: '2026-07-08', time: '9:00 AM', duration: '19 min', score: 58, status: 'ready',
+    grades: { fnd:'C', ct:'B', sit:'C', pa:'C', cq:'D', sc:'C', obj:'D', lct:'C' },
+    note: 'Call ended before a consequence question ever landed — moved from situation straight to solution. Recommend a teardown review with the manager before the follow-up call.' },
+];
+
+// Cross-call coaching intelligence — the "Try This" pattern from 7Q's Hub,
+// reframed around Natural Selling Grading™ categories.
+const MOCK_PATTERNS = [
+  { count: 13, total: 22, type: 'risk', trend: 'up', name: 'Premature Solution Pivot',
+    desc: 'Offering solutions before completing Problem Awareness and Consequence Questions skips emotional commitment.',
+    quote: '"Do you like the results you\'re getting from your current approach?"' },
+  { count: 12, total: 22, type: 'risk', trend: 'up', name: 'Monologue Risk',
+    desc: 'Long uninterrupted stretches during the solution phase prevent prospects from self-discovering their need to act.',
+    quote: '"Which part of that would help you the most right now?"' },
+  { count: 9, total: 22, type: 'watch', trend: 'flat', name: 'Objection Reframes Sound Scripted',
+    desc: 'Fee and "need to think about it" objections are technically handled but read as memorized, not conversational.',
+    quote: '"Say that back to me in your own words — what would change your mind?"' },
+  { count: 18, total: 22, type: 'strength', trend: 'up', name: 'Strong Consequence Questions',
+    desc: 'Consequence-stage questions are consistently landing and surfacing real, specific fears rather than generic ones.',
+    quote: 'Keep leading with a real number or date when you ask "what happens if..."' },
+];
+
+// Weekly Coach IQ average — feeds the trend chart.
+const MOCK_TREND = [
+  { label: 'May 18', score: 74 }, { label: 'May 25', score: 76 }, { label: 'Jun 1', score: 78 },
+  { label: 'Jun 8', score: 77 }, { label: 'Jun 15', score: 81 }, { label: 'Jun 22', score: 83 },
+  { label: 'Jun 29', score: 85 }, { label: 'Jul 6', score: 87 }, { label: 'Jul 13', score: 91 },
+];
+
+const AVATAR_PALETTE = ['#0D9488', '#2DD4BF', '#0B7A70', '#C08A2E', '#5A6690', '#14B8A6'];
+function avatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+function initials(name) {
+  return name.split(/[\s&]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+/* ---------------------------------------------------------------------
+   Coach IQ ring gauge — signature visual element, shared with call review.
+--------------------------------------------------------------------- */
+function ringColor(score) {
+  if (score === null) return { stroke: '#DDE1E6', text: 'var(--ink-300)' };
+  if (score >= 85) return { stroke: 'url(#gradTeal)', text: 'var(--ink-900)' };
+  if (score >= 70) return { stroke: 'var(--amber-600)', text: 'var(--ink-900)' };
+  return { stroke: 'var(--rose-600)', text: 'var(--ink-900)' };
+}
+
+function renderRing(container, score, size = 52) {
+  const radius = size / 2 - 4;
+  const circumference = 2 * Math.PI * radius;
+  const pct = score === null ? 0 : Math.min(100, Math.max(0, score)) / 100;
+  const offset = circumference * (1 - pct);
+  const colors = ringColor(score);
+
+  container.innerHTML = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <defs>
+        <linearGradient id="gradTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#2DD4BF"/>
+          <stop offset="100%" stop-color="#0D9488"/>
+        </linearGradient>
+      </defs>
+      <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="#E9ECEF" stroke-width="4"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="${colors.stroke}"
+        stroke-width="4" stroke-linecap="round"
+        stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/>
+    </svg>
+    <div class="ring-score" style="color:${colors.text}">${score === null ? '···' : score}</div>
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   Trend chart — SVG line + area, matching 7Q's Hub chart pattern.
+--------------------------------------------------------------------- */
+function renderTrendChart(data) {
+  const w = 640, h = 160, padL = 30, padR = 10, padT = 14, padB = 26;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const min = 0, max = 100;
+
+  const points = data.map((d, i) => {
+    const x = padL + (i / (data.length - 1)) * plotW;
+    const y = padT + plotH - ((d.score - min) / (max - min)) * plotH;
+    return { x, y, ...d };
+  });
+
+  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const areaPath = linePath + ` L${points[points.length - 1].x.toFixed(1)},${padT + plotH} L${points[0].x.toFixed(1)},${padT + plotH} Z`;
+
+  const gridLines = [0, 25, 50, 75, 100].map(v => {
+    const y = padT + plotH - ((v - min) / (max - min)) * plotH;
+    return `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,4"/>
+            <text x="${padL - 8}" y="${y + 3}" font-size="9" fill="var(--ink-400)" text-anchor="end" font-family="var(--font-mono)">${v}</text>`;
+  }).join('');
+
+  const dots = points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#FFFFFF" stroke="var(--teal-600)" stroke-width="2"/>`).join('');
+  const labels = points.map((p, i) => (i % 2 === 0 ? `<text x="${p.x}" y="${h - 6}" font-size="9.5" fill="var(--ink-400)" text-anchor="middle" font-family="var(--font-mono)">${p.label}</text>` : '')).join('');
+
+  document.getElementById('trendChart').innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#14B8A6" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#14B8A6" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <path d="${areaPath}" fill="url(#trendFill)"/>
+      <path d="${linePath}" fill="none" stroke="var(--teal-600)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+      ${labels}
+    </svg>
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   Coaching Patterns
+--------------------------------------------------------------------- */
+function trendIcon(trend) {
+  if (trend === 'up') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M23 6 13.5 15.5l-5-5L1 18"/><path d="M17 6h6v6"/></svg>`;
+  if (trend === 'down') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M23 18 13.5 8.5l-5 5L1 6"/><path d="M17 18h6v-6"/></svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14"/></svg>`;
+}
+
+function renderPatterns() {
+  const spotlightHost = document.getElementById('patternSpotlight');
+  const listHost = document.getElementById('patternGrid');
+  const proTipCard = document.getElementById('proTipCard');
+
+  if (MOCK_PATTERNS.length === 0) {
+    spotlightHost.innerHTML = '';
+    listHost.innerHTML = '<div class="pattern-empty">Once you\'ve got a few scored calls in, your coach will start spotting real patterns here.</div>';
+    proTipCard.style.display = 'none';
+    return;
+  }
+
+  // Real fix — instead of treating every pattern as equally important in
+  // a dense grid, surface the single most worth-acting-on pattern as a
+  // genuine coaching moment, then list the rest calmly underneath.
+  // Priority: biggest risk first, then biggest watch item, then — if
+  // everything's actually going well — lead with the strongest strength.
+  const priority = { risk: 0, watch: 1, strength: 2 };
+  const sorted = [...MOCK_PATTERNS].sort((a, b) => (priority[a.type] ?? 3) - (priority[b.type] ?? 3) || b.count - a.count);
+  const [featured, ...rest] = sorted;
+
+  const isStrengthFeatured = featured.type === 'strength';
+  const spotlightLabel = isStrengthFeatured ? 'Your strongest edge right now' : 'Worth 15 minutes of focused practice';
+
+  // Pro Tip — same featured pattern already computed above (real
+  // priority: risk, then watch, then strength), reflected as an
+  // always-on coaching nudge. Skips a "tip" when the top item is
+  // actually a strength, since a genuine focus area doesn't exist yet.
+  if (featured.type === 'risk' || featured.type === 'watch') {
+    document.getElementById('proTipLabel').textContent = `Pro Tip — ${currentCallType === 'recruiting' ? 'Recruiting' : 'Client'} Calls`;
+    document.getElementById('proTipText').textContent = `Focus area: ${featured.name}. ${featured.desc}`;
+    proTipCard.style.display = 'flex';
+  } else {
+    proTipCard.style.display = 'none';
+  }
+  const spotlightHeadline = isStrengthFeatured
+    ? `You're consistently nailing ${featured.name.toLowerCase()}.`
+    : `Let's tighten up ${featured.name.toLowerCase()}.`;
+
+  spotlightHost.innerHTML = `
+    <div class="coach-spotlight">
+      <div class="coach-spotlight-freq">
+        <div class="num">${featured.count}<span style="font-size:16px;color:rgba(255,255,255,0.4);">/${featured.total}</span></div>
+        <div class="label">recent calls</div>
+      </div>
+      <div class="coach-spotlight-eyebrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+        ${spotlightLabel}
+      </div>
+      <h3>${spotlightHeadline}</h3>
+      <p>${featured.desc}</p>
+      ${featured.quote ? `<div class="coach-spotlight-quote">"${featured.quote}"</div>` : ''}
+      <a href="roleplay.html" class="coach-spotlight-cta">
+        ${isStrengthFeatured ? 'Keep sharpening it' : 'Practice this now'}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  `;
+
+  const VISIBLE_LIMIT = 4;
+  const visible = rest.slice(0, VISIBLE_LIMIT);
+  const hidden = rest.slice(VISIBLE_LIMIT);
+
+  const rowHtml = p => `
+    <a href="roleplay.html" class="pattern-row ${p.type}">
+      <div class="pattern-row-dot"></div>
+      <div class="pattern-row-body">
+        <div class="pattern-row-name">${p.name}</div>
+        <div class="pattern-row-desc">${p.desc}</div>
+      </div>
+      <div class="pattern-row-freq">${p.count}/${p.total} calls</div>
+      <svg class="pattern-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  `;
+
+  listHost.innerHTML = visible.map(rowHtml).join('');
+
+  if (hidden.length > 0) {
+    const moreBtn = document.createElement('button');
+    moreBtn.textContent = `Show ${hidden.length} more pattern${hidden.length === 1 ? '' : 's'}`;
+    moreBtn.style.cssText = 'background:none;border:none;color:var(--teal-600);font-size:12.5px;font-weight:700;cursor:pointer;padding:10px 4px;text-align:left;font-family:inherit;';
+    moreBtn.addEventListener('click', () => {
+      listHost.innerHTML = [...visible, ...hidden].map(rowHtml).join('');
+    });
+    listHost.appendChild(moreBtn);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Meeting list
+--------------------------------------------------------------------- */
+function gradeClass(letter) {
+  if (!letter) return '';
+  if (letter === 'A') return 'grade-A';
+  if (letter === 'B') return 'grade-B';
+  return 'grade-C';
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function renderStats() {
+  const readyScores = MOCK_MEETINGS.filter(m => m.score !== null).map(m => m.score);
+  const avg = readyScores.length ? Math.round(readyScores.reduce((a,b) => a+b, 0) / readyScores.length) : 0;
+
+  // Real "this week" / "last week" boundaries computed from the actual
+  // current date — this used to compare against a hardcoded date string
+  // that would silently go stale as time passed.
+  const now = new Date();
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setDate(now.getDate() - now.getDay());
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+  const thisWeekCount = MOCK_MEETINGS.filter(m => new Date(m.date) >= startOfThisWeek).length;
+  const lastWeekCount = MOCK_MEETINGS.filter(m => {
+    const d = new Date(m.date);
+    return d >= startOfLastWeek && d < startOfThisWeek;
+  }).length;
+  const weekDelta = thisWeekCount - lastWeekCount;
+
+  const needsReview = MOCK_MEETINGS.filter(m => m.score !== null && m.score < 70).length;
+
+  document.getElementById('heroScoreValue').textContent = avg;
+  document.getElementById('heroCallCount').textContent = readyScores.length;
+  const patternCountEl = document.getElementById('patternCallCount');
+  if (patternCountEl) patternCountEl.textContent = readyScores.length ? `last ${readyScores.length}` : 'recent';
+  document.getElementById('statMeetings').textContent = thisWeekCount;
+  document.getElementById('statMeetingsDelta').textContent =
+    weekDelta > 0 ? `▲ ${weekDelta} vs. last week` : weekDelta < 0 ? `▼ ${Math.abs(weekDelta)} vs. last week` : 'Same as last week';
+  document.getElementById('statReview').textContent = needsReview;
+}
+
+/* ---------------------------------------------------------------------
+   Drawer
+--------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------
+   Live API wiring — falls back to the MOCK_ data above if the backend
+   isn't reachable, so this page keeps working as a demo either way.
+   Set window.GRWTH_API_BASE and window.GRWTH_ADVISOR_ID before this
+   script runs (or via localStorage key "grwth_advisor_id") to point at
+   a real deployment instead of localhost.
+--------------------------------------------------------------------- */
+const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+const ADVISOR_ID = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+
+async function fetchJSON(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, { ...options, credentials: 'include', headers: { 'x-advisor-id': ADVISOR_ID, ...(options.headers || {}) } });
+  if (!res.ok) throw new Error(`API ${res.status} on ${path}`);
+  return res.json();
+}
+
+function replaceContents(arr, newItems) {
+  arr.length = 0;
+  arr.push(...newItems);
+}
+
+// Converts a raw startAtISO timestamp into the { date, time } shape the
+// rest of this page already expects — done here in the browser so it
+// reflects the viewer's actual local timezone, not the server's. This is
+// the same fix applied to Meetings' Future tab; the dashboard and Past
+// list had the same bug (server-side formatting baked in UTC).
+function deriveDateTime(meeting) {
+  const d = new Date(meeting.startAtISO);
+  const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return {
+    ...meeting,
+    date: localDate,
+    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+  };
+}
+
+let currentCallType = 'sales';
+
+async function loadLiveData() {
+  if (!ADVISOR_ID) { console.warn('[GRWTH Coach] No agent ID configured — using mock data.'); return; }
+
+  // Real fix — this used to be Promise.all, meaning if even one of the
+  // three fetches failed (e.g. patterns having zero rows for a
+  // brand-new account), the whole dashboard silently fell back to mock
+  // data for everything, not just the piece that actually failed.
+  // Promise.allSettled lets each section succeed or fail independently.
+  const [meetingsResult, patternsResult, trendResult] = await Promise.allSettled([
+    fetchJSON(`/api/grwth-coach/meetings?range=30d&callType=${currentCallType}`),
+    fetchJSON(`/api/grwth-coach/patterns?range=30d&callType=${currentCallType}`),
+    fetchJSON(`/api/grwth-coach/trend?weeks=9&callType=${currentCallType}`),
+  ]);
+
+  let anySectionFailed = false;
+
+  if (meetingsResult.status === 'fulfilled') {
+    replaceContents(MOCK_MEETINGS, meetingsResult.value.map(deriveDateTime));
+
+    const talkValues = meetingsResult.value.map(m => m.talkTimePct).filter(v => v != null);
+    if (talkValues.length) {
+      const avgTalk = Math.round(talkValues.reduce((a, b) => a + b, 0) / talkValues.length);
+      document.getElementById('statTalkListen').textContent = `${avgTalk} / ${100 - avgTalk}`;
+      document.getElementById('statTalkListenDelta').textContent = avgTalk > 55 ? 'Slightly agent-heavy' : avgTalk < 45 ? 'Listening-heavy' : 'Well balanced';
+    } else {
+      document.getElementById('statTalkListen').textContent = '—';
+      document.getElementById('statTalkListenDelta').textContent = 'No calls analyzed yet';
+    }
+  } else {
+    console.warn('[GRWTH Coach] Meetings fetch failed:', meetingsResult.reason?.message);
+    replaceContents(MOCK_MEETINGS, []);
+    anySectionFailed = true;
+  }
+
+  if (patternsResult.status === 'fulfilled') {
+    replaceContents(MOCK_PATTERNS, patternsResult.value);
+  } else {
+    console.warn('[GRWTH Coach] Patterns fetch failed:', patternsResult.reason?.message);
+    replaceContents(MOCK_PATTERNS, []);
+    anySectionFailed = true;
+  }
+
+  if (trendResult.status === 'fulfilled') {
+    replaceContents(MOCK_TREND, trendResult.value);
+  } else {
+    console.warn('[GRWTH Coach] Trend fetch failed:', trendResult.reason?.message);
+    replaceContents(MOCK_TREND, []);
+    anySectionFailed = true;
+  }
+
+  // Real fix — a failed section here used to silently leave the
+  // original hardcoded placeholder data in place with zero visible
+  // sign anything was wrong (the same class of bug found on Call
+  // Review, just per-section instead of whole-page). Each failed
+  // section is now cleared to empty (its existing empty-state message
+  // takes over) rather than showing stale fake data, and this banner
+  // makes the failure itself visible instead of silent.
+  if (anySectionFailed) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:var(--rose-100,#FBE6E3);border:1px solid var(--rose-600,#D5493A);color:var(--rose-600,#D5493A);font-size:12.5px;font-weight:600;padding:10px 16px;border-radius:10px;margin-bottom:16px;';
+    banner.textContent = "Some data on this page couldn't load — try refreshing.";
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+}
+
+document.getElementById('newRecordingBtn').addEventListener('click', () => {
+  document.getElementById('newRecordingModalOverlay').style.display = 'flex';
+});
+document.getElementById('closeNewRecordingModal').addEventListener('click', () => {
+  document.getElementById('newRecordingModalOverlay').style.display = 'none';
+});
+
+/* ---------------------------------------------------------------------
+   Init
+--------------------------------------------------------------------- */
+document.querySelectorAll('.dash-type-tab').forEach(tab => {
+  tab.addEventListener('click', async () => {
+    if (tab.dataset.type === currentCallType) return;
+    document.querySelectorAll('.dash-type-tab').forEach(t => {
+      t.classList.remove('active');
+      t.style.background = 'transparent';
+      t.style.color = 'var(--ink-500)';
+      t.style.boxShadow = 'none';
+    });
+    tab.classList.add('active');
+    tab.style.background = 'var(--white)';
+    tab.style.color = 'var(--ink-900)';
+    tab.style.boxShadow = '0 1px 3px rgba(14,16,24,0.08)';
+    currentCallType = tab.dataset.type;
+    await loadLiveData();
+    renderStats();
+    renderTrendChart(MOCK_TREND);
+    renderPatterns();
+  });
+});
+
+(async function init() {
+  await loadLiveData();
+  renderStats();
+  renderTrendChart(MOCK_TREND);
+  renderPatterns();
+  renderHomeworkCard();
+})();
+
+/* ---------------------------------------------------------------------
+   Weekly training homework -- agent-facing card
+--------------------------------------------------------------------- */
+async function renderHomeworkCard() {
+  const card = document.getElementById('homeworkCard');
+  if (!card) return;
+  try {
+    const data = await fetchJSON('/api/grwth-coach/homework/mine');
+    const a = data.assignment;
+    const streak = data.streak || 0;
+    const streakBadge = streak > 0 ? `<span style="margin-left:10px;font-size:11.5px;font-weight:700;color:var(--amber-600);white-space:nowrap;">🔥 ${streak} week${streak === 1 ? '' : 's'}</span>` : '';
+
+    if (!a) { card.style.display = 'none'; return; }
+
+    card.style.display = 'block';
+    if (a.status === 'completed') {
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--teal-100);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2.5" width="18" height="18"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:14.5px;color:var(--ink-900);">This week's homework — done${streakBadge}</div>
+            <div style="font-size:12px;color:var(--ink-500);margin-top:2px;">Nice work. A new one lands next Monday.</div>
+          </div>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:14px;min-width:0;">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--amber-100);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--amber-600)" stroke-width="2" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            </div>
+            <div style="min-width:0;">
+              <div style="font-family:var(--font-display);font-weight:800;font-size:14.5px;color:var(--ink-900);">This week's training homework${streakBadge}</div>
+              <div style="font-size:12px;color:var(--ink-500);margin-top:2px;">15–20 minutes · one lesson, one quiz</div>
+            </div>
+          </div>
+          <a href="natural-selling-vault.html?homework=${a.id}&module=${encodeURIComponent(a.moduleId)}&lesson=${a.lessonIndex}" style="flex-shrink:0;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-size:12.5px;font-weight:700;">Start Homework</a>
+        </div>
+      `;
+    }
+  } catch (err) {
+    card.style.display = 'none';
+  }
+}
+</script>
+
+
+<script>
+(function() {
+  var apiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+  var advisorId = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+  if (!advisorId) return;
+  fetch(apiBase + '/api/grwth-coach/me', { credentials: 'include', headers: { 'x-advisor-id': advisorId } })
+    .then(function(r) { return r.json(); })
+    .then(function(me) {
+      if (me.superAdmin) {
+        var el = document.getElementById('superAdminNavGroup');
+        if (el) el.style.display = 'block';
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+
+<script>
+(function() {
+  var apiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+  var advisorId = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+  if (!advisorId) return;
+  fetch(apiBase + '/api/grwth-coach/roleplay/personalized-scenarios', { credentials: 'include', headers: { 'x-advisor-id': advisorId } })
+    .then(function(r) { return r.json(); })
+    .then(function(scenarios) {
+      if (Array.isArray(scenarios) && scenarios.length > 0) {
+        var dot = document.getElementById('roleplayReadyDot');
+        if (dot) dot.style.display = 'block';
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+</body>
+</html>

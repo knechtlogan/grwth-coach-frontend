@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Agent Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!--
+  =========================================================================
+  GRWTH COACH — ADVISOR PROFILE
+  The real destination for Team Performance's "View Full Agent Profile"
+  button, which was previously wired to nothing.
+
+  WIRING NOTES:
+  - Reads ?id=<advisorId> from the URL, set by Team Performance before
+    navigating here.
+  - GET /api/grwth-coach/advisors/:id/profile requires the logged-in
+    advisor to be an agency_owner — same access rule as Team Performance.
+  =========================================================================
+-->
+
+<style>
+  :root {
+    --teal-700: #0B7A70; --teal-600: #0D9488; --teal-500: #14B8A6; --teal-400: #2DD4BF;
+    --slate-950: #0E1018; --slate-900: #1A1A2E;
+    --bg: #F4F6F8; --white: #FFFFFF;
+    --ink-900: #12141F; --ink-700: #2E3244; --ink-500: #6B7280; --ink-400: #9098A8; --ink-300: #D1D5DB;
+    --line: #E4E7EC;
+    --amber-600: #C08A2E; --amber-100: #FBF1DD;
+    --rose-600: #D5493A; --rose-100: #FBE6E3;
+    --teal-100: #E3F5F2;
+    --font-display: 'Geist', -apple-system, sans-serif;
+    --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+    --radius: 16px; --radius-sm: 10px;
+    --shadow-card: 0 1px 2px rgba(14,16,24,0.04), 0 12px 28px -14px rgba(14,16,24,0.14);
+    --shadow-glow: 0 0 0 1px rgba(13,148,136,0.25), 0 16px 40px -12px rgba(13,148,136,0.35);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); font-family: var(--font-body); color: var(--ink-900); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 32px 24px 60px; }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-500); margin-bottom: 18px; }
+  .back-link:hover { color: var(--teal-700); }
+  .back-link svg { width: 14px; height: 14px; }
+
+  .header-card {
+    background: radial-gradient(circle at 85% -10%, rgba(45,212,191,0.35), transparent 55%), linear-gradient(150deg, var(--slate-900), var(--slate-950));
+    border-radius: var(--radius); box-shadow: var(--shadow-glow); padding: 26px 28px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .header-avatar { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 22px; color: #FFFFFF; flex-shrink: 0; }
+  .header-name { font-family: var(--font-display); font-weight: 700; font-size: 22px; color: #FFFFFF; margin-bottom: 4px; }
+  .header-meta { font-size: 12.5px; color: #9DB0B4; }
+  .header-score { margin-left: auto; text-align: right; }
+  .header-score-value { font-family: var(--font-display); font-weight: 700; font-size: 40px; color: #FFFFFF; line-height: 1; }
+  .header-score-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--teal-400); margin-top: 4px; }
+
+  .stat-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-card); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--ink-400); margin-bottom: 7px; }
+  .stat-value { font-family: var(--font-display); font-weight: 700; font-size: 24px; color: var(--ink-900); }
+
+  .section-head { font-family: var(--font-display); font-weight: 700; font-size: 16px; margin: 28px 0 12px; }
+
+  .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .category-cell { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: var(--shadow-card); }
+  .category-name { font-size: 11px; color: var(--ink-500); margin-bottom: 6px; }
+  .category-letter { font-family: var(--font-mono); font-weight: 700; font-size: 18px; }
+  .category-letter.A { color: var(--teal-700); }
+  .category-letter.B { color: var(--amber-600); }
+  .category-letter.C, .category-letter.D { color: var(--rose-600); }
+
+  .calls-list { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); overflow: hidden; }
+  .call-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.12s ease; }
+  .call-row:last-child { border-bottom: none; }
+  .call-row:hover { background: var(--teal-100); }
+  .call-client { font-size: 13.5px; font-weight: 700; }
+  .call-date { font-size: 11.5px; color: var(--ink-400); margin-top: 2px; }
+  .call-score { font-family: var(--font-mono); font-weight: 700; font-size: 15px; }
+
+  .empty-note { padding: 40px 20px; text-align: center; color: var(--ink-400); font-size: 13px; }
+
+  @media (max-width: 600px) { .category-grid { grid-template-columns: 1fr 1fr; } .stat-strip { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="viewAsBanner" style="display:none;position:sticky;top:0;z-index:200;background:linear-gradient(90deg,#1A1B2E,#0E1018);color:#fff;padding:10px 24px;font-size:12.5px;font-weight:600;display:none;align-items:center;justify-content:center;gap:10px;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14" style="color:#2DD4BF;"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+  <span>Viewing as <strong id="viewAsName">—</strong> — this is exactly what they see.</span>
+  <button id="exitViewAsBtn" style="background:rgba(255,255,255,0.12);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;margin-left:6px;">Exit Preview</button>
+</div>
+
+<script>
+(function() {
+  // Real fix — the "view as" shim must run before ANY other script on
+  // the page reads the advisor ID, so it patches localStorage.getItem
+  // itself rather than requiring every page's fetch logic to be touched
+  // individually.
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  if (viewingAsId) {
+    var originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === 'grwth_advisor_id') return viewingAsId;
+      return originalGetItem.call(this, key);
+    };
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var apiBase = window.GRWTH_API_BASE || Storage.prototype.getItem.call(localStorage, 'grwth_api_base') || 'https://api.grwthtech.com';
+  var realAdvisorId = Storage.prototype.getItem.call(localStorage, 'grwth_advisor_id');
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  var viewingAsName = sessionStorage.getItem('grwth_viewing_as_name');
+
+  if (viewingAsId && viewingAsName) {
+    document.getElementById('viewAsName').textContent = viewingAsName;
+    document.getElementById('viewAsBanner').style.display = 'flex';
+  }
+
+  document.getElementById('exitViewAsBtn').addEventListener('click', function() {
+    sessionStorage.removeItem('grwth_viewing_as_id');
+    sessionStorage.removeItem('grwth_viewing_as_name');
+    window.location.reload();
+  });
+
+  // Real fix — the "View As" button itself now lives only on
+  // Settings, per Logan's requirement. The shim above and this banner
+  // still apply on every page so browsing the rest of the app while
+  // viewing as someone else keeps working correctly.
+});
+</script>
+
+
+
+<div class="main">
+  <a class="back-link" href="team-performance.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+    Back to Team Performance
+  </a>
+
+  <div class="header-card">
+    <div class="header-avatar" id="headerAvatar">—</div>
+    <div>
+      <div class="header-name" id="headerName">Loading…</div>
+      <div class="header-meta" id="headerMeta">—</div>
+    </div>
+    <div class="header-score">
+      <div class="header-score-value" id="headerScore">—</div>
+      <div class="header-score-label">Avg Coach IQ</div>
+    </div>
+  </div>
+
+  <div class="stat-strip">
+    <div class="stat-card"><div class="stat-label">Total Calls Scored</div><div class="stat-value" id="statCalls">—</div></div>
+    <div class="stat-card"><div class="stat-label">Role</div><div class="stat-value" id="statRole">—</div></div>
+  </div>
+
+  <div class="section-head">Category Performance</div>
+  <div class="category-grid" id="categoryGrid"></div>
+
+  <div class="section-head">Recent Calls</div>
+  <div class="calls-list" id="callsList"></div>
+</div>
+
+<script>
+const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+const ADVISOR_ID = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+const PROFILE_ID = new URLSearchParams(window.location.search).get('id') || localStorage.getItem('grwth_advisor_profile_id') || '';
+
+const CATEGORY_LABELS = {
+  fnd: 'Foundations', ct: 'Connecting & Tone', sit: 'Situation Questions', pa: 'Problem Awareness',
+  cq: 'Consequence Questions', sc: 'Solution & Commitment', obj: 'Objection Reframes', lct: 'Live Call Teardown'
+};
+
+const AVATAR_PALETTE = ['#0D9488', '#2DD4BF', '#0B7A70', '#C08A2E', '#5A6690', '#14B8A6'];
+function avatarColor(name) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length]; }
+function initials(name) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase(); }
+
+async function fetchJSON(path) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include', headers: { 'x-advisor-id': ADVISOR_ID } });
+  if (!res.ok) throw new Error(`API ${res.status} on ${path}`);
+  return res.json();
+}
+
+async function load() {
+  if (!PROFILE_ID) {
+    document.getElementById('headerName').textContent = 'No agent selected';
+    document.getElementById('headerMeta').textContent = 'Go back to Team Performance and click an agent first.';
+    return;
+  }
+
+  try {
+    const data = await fetchJSON(`/api/grwth-coach/advisors/${PROFILE_ID}/profile`);
+
+    if (data.photoUrl) {
+      document.getElementById('headerAvatar').style.background = `center/cover no-repeat url(${data.photoUrl})`;
+      document.getElementById('headerAvatar').textContent = '';
+    } else {
+      document.getElementById('headerAvatar').style.background = avatarColor(data.name);
+      document.getElementById('headerAvatar').textContent = initials(data.name);
+    }
+    document.getElementById('headerName').textContent = data.name;
+    document.getElementById('headerMeta').textContent = data.email;
+    document.getElementById('headerScore').textContent = data.avgScore;
+    document.getElementById('statCalls').textContent = data.totalCalls;
+    document.getElementById('statRole').textContent = data.role === 'agency_owner' ? 'Agency Owner' : 'Agent';
+
+    document.getElementById('categoryGrid').innerHTML = Object.entries(data.categoryAverages).map(([key, val]) => `
+      <div class="category-cell">
+        <div class="category-name">${CATEGORY_LABELS[key] || key}</div>
+        <div class="category-letter ${val.letter}">${val.letter} · ${val.score}</div>
+      </div>
+    `).join('');
+
+    const callsHost = document.getElementById('callsList');
+    if (data.recentCalls.length === 0) {
+      callsHost.innerHTML = '<div class="empty-note">No scored calls yet for this agent.</div>';
+    } else {
+      callsHost.innerHTML = data.recentCalls.map(c => `
+        <div class="call-row" data-id="${c.id}">
+          <div>
+            <div class="call-client">${c.client}</div>
+            <div class="call-date">${c.date}</div>
+          </div>
+          <div class="call-score" style="color:${c.score >= 85 ? 'var(--teal-700)' : c.score >= 70 ? 'var(--amber-600)' : 'var(--rose-600)'}">${c.score ?? '—'}</div>
+        </div>
+      `).join('');
+      callsHost.querySelectorAll('.call-row').forEach(row => {
+        row.addEventListener('click', () => {
+          localStorage.setItem('grwth_call_id', row.dataset.id);
+          window.location.href = 'call-review.html';
+        });
+      });
+    }
+  } catch (err) {
+    document.getElementById('headerName').textContent = 'Could not load this profile';
+    document.getElementById('headerMeta').textContent = err.message;
+    console.error('[GRWTH Coach] Agent profile load failed:', err);
+  }
+}
+
+load();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Join Your Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal-700: #0B7A70; --teal-600: #0D9488; --teal-500: #14B8A6; --teal-400: #2DD4BF;
+    --slate-950: #0E1018; --slate-900: #1A1A2E;
+    --white: #FFFFFF;
+    --ink-900: #12141F; --ink-700: #2E3244; --ink-500: #6B7280; --ink-400: #9098A8;
+    --line: #E4E7EC; --rose-600: #D5493A;
+    --font: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: var(--font); color: var(--ink-900); -webkit-font-smoothing: antialiased;
+    background: radial-gradient(circle at 85% -10%, rgba(45,212,191,0.25), transparent 55%), linear-gradient(150deg, var(--slate-900), var(--slate-950));
+    display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+  .card { background: var(--white); border-radius: var(--radius); box-shadow: 0 30px 80px -20px rgba(0,0,0,0.5); padding: 36px 34px; width: 400px; max-width: 100%; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
+  .brand-name { font-weight: 700; font-size: 15px; }
+  .brand-sub { font-size: 10px; color: var(--teal-700); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+
+  .invite-banner { background: #E3F5F2; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--teal-700); margin-bottom: 20px; line-height: 1.5; }
+
+  h1 { font-family: var(--font); font-weight: 700; font-size: 20px; margin: 0 0 18px; letter-spacing: -0.3px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { font-size: 11.5px; font-weight: 700; color: var(--ink-700); display: block; margin-bottom: 5px; }
+  .field input { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; }
+  .field input:disabled { background: #F4F6F8; color: var(--ink-500); }
+  .field input:focus { outline: none; border-color: var(--teal-500); box-shadow: 0 0 0 3px rgba(20,184,166,0.15); }
+
+  .submit-btn {
+    width: 100%; padding: 13px; border: none; border-radius: 10px; margin-top: 6px;
+    background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff;
+    font-weight: 700; font-size: 14px; box-shadow: 0 10px 24px -10px rgba(13,148,136,0.6);
+  }
+  .submit-btn:disabled { opacity: 0.6; }
+
+  .error-box { background: #FBE6E3; color: var(--rose-600); border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 14px; display: none; }
+  .loading-note { text-align: center; color: var(--ink-500); font-size: 13px; padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <img src="grwth-icon.png" alt="GRWTH Coach" class="brand-mark" style="object-fit:cover;">
+    <div>
+      <div class="brand-name">GRWTH Coach</div>
+      <div class="brand-sub">Coach IQ Engine</div>
+    </div>
+  </div>
+
+  <div id="loadingState" class="loading-note">Checking your invitation…</div>
+
+  <div id="formState" style="display:none;">
+    <div class="invite-banner" id="inviteBanner"></div>
+    <h1 id="formHeading">Set up your account</h1>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- New person, no account yet -->
+    <form id="acceptForm">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="email" disabled>
+      </div>
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="name" required placeholder="Jane Smith">
+      </div>
+      <div class="field">
+        <label>Create a Password</label>
+        <input type="password" id="password" required minlength="8" placeholder="At least 8 characters">
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">Join the Team</button>
+    </form>
+
+    <!-- Already has a GRWTH Coach account — just log in to switch teams -->
+    <form id="joinForm" style="display:none;">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="joinEmail" disabled>
+      </div>
+      <div class="field">
+        <label>Your Password</label>
+        <input type="password" id="joinPassword" required placeholder="Your existing password">
+      </div>
+
+      <button type="submit" class="submit-btn" id="joinSubmitBtn">Join This Team</button>
+    </form>
+  </div>
+
+  <div id="invalidState" style="display:none;">
+    <div class="error-box" style="display:block;" id="invalidMessage"></div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+  const token = new URLSearchParams(window.location.search).get('token');
+
+  async function init() {
+    if (!token) {
+      showInvalid('This invitation link is missing its token.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grwth-coach/invitations/token/${token}`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'This invitation is not valid.');
+
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('formState').style.display = 'block';
+      document.getElementById('inviteBanner').textContent =
+        `${data.invitedByName} invited you to join ${data.agencyName} on GRWTH Coach.`;
+
+      if (data.accountExists) {
+        document.getElementById('formHeading').textContent = 'You already have an account';
+        document.getElementById('joinEmail').value = data.email;
+        document.getElementById('acceptForm').style.display = 'none';
+        document.getElementById('joinForm').style.display = 'block';
+      } else {
+        document.getElementById('email').value = data.email;
+      }
+    } catch (err) {
+      showInvalid(err.message);
+    }
+  }
+
+  function showInvalid(message) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('invalidState').style.display = 'block';
+    document.getElementById('invalidMessage').textContent = message;
+  }
+
+  document.getElementById('acceptForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('errorBox');
+    const submitBtn = document.getElementById('submitBtn');
+    errorBox.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Joining…';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grwth-coach/invitations/token/${token}/accept`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('name').value.trim(),
+          password: document.getElementById('password').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not join the team.');
+
+      localStorage.setItem('grwth_api_base', API_BASE);
+      localStorage.setItem('grwth_advisor_id', data.advisorId);
+      localStorage.setItem('grwth_advisor_name', data.name);
+      localStorage.setItem('grwth_advisor_email', data.email);
+      localStorage.setItem('grwth_advisor_role', data.role);
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Join the Team';
+    }
+  });
+
+  document.getElementById('joinForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('errorBox');
+    const joinSubmitBtn = document.getElementById('joinSubmitBtn');
+    errorBox.style.display = 'none';
+    joinSubmitBtn.disabled = true;
+    joinSubmitBtn.textContent = 'Joining…';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/grwth-coach/invitations/token/${token}/join`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: document.getElementById('joinPassword').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not join the team.');
+
+      localStorage.setItem('grwth_api_base', API_BASE);
+      localStorage.setItem('grwth_advisor_id', data.advisorId);
+      localStorage.setItem('grwth_advisor_name', data.name);
+      localStorage.setItem('grwth_advisor_email', data.email);
+      localStorage.setItem('grwth_advisor_role', data.role);
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      joinSubmitBtn.disabled = false;
+      joinSubmitBtn.textContent = 'Join This Team';
+    }
+  });
+
+  init();
+</script>
+
+</body>
+</html>

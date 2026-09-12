@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Settings</title>
+<script>
+  (function() {
+    var saved = localStorage.getItem('grwth_theme');
+    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!--
+  =========================================================================
+  GRWTH COACH — SETTINGS
+  Integrations, Meeting Recording rules, Account, and Subscription —
+  the unglamorous plumbing that makes "Auto-Recording" on the Meetings
+  page an actual setting instead of just a label.
+
+  WIRING NOTES FOR MANUS INTEGRATION:
+  - Connection states below are mocked. Real OAuth flows for Google
+    Calendar / Outlook / Zoom need to run through Manus's actual auth,
+    not this file — treat the toggles here as UI only until wired.
+  - Meeting Types map directly to the "Auto-Recording" tag shown on the
+    Meetings page's Future tab — keep those two in sync if extended.
+  - Subscription data (plan, usage) should come from your billing
+    provider (Stripe, per your other tools) rather than being hardcoded.
+  =========================================================================
+-->
+
+<style>
+  :root {
+    --teal-700: #0B7A70; --teal-600: #0D9488; --teal-500: #14B8A6; --teal-400: #2DD4BF;
+    --teal-glow: rgba(13,148,136,0.45); --teal-muted: rgba(13,148,136,0.12);
+    --slate-950: #0E1018; --slate-900: #1A1A2E; --slate-800: #252A3D; --slate-700: #363C54;
+    --bg: #F4F6F8; --white: #FFFFFF;
+    --ink-900: #12141F; --ink-700: #2E3244; --ink-500: #6B7280; --ink-400: #9098A8; --ink-300: #D1D5DB;
+    --line: #E4E7EC;
+    --amber-600: #C08A2E; --amber-100: #FBF1DD;
+    --rose-600: #D5493A; --rose-100: #FBE6E3;
+    --teal-100: #E3F5F2;
+    --font-display: 'Geist', -apple-system, sans-serif;
+    --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+    --radius: 16px; --radius-sm: 10px;
+    --shadow-card: 0 1px 2px rgba(14,16,24,0.04), 0 12px 28px -14px rgba(14,16,24,0.14);
+  }
+
+  /* Real fix — light/dark toggle, same token names as :root above, so
+     every existing rule adapts automatically with zero other changes.
+     Applied via [data-theme="dark"] on <html>, set before first paint
+     by a blocking script in <head> to avoid a flash of the wrong theme. */
+  html[data-theme="dark"] {
+    --bg: #0B0E17;
+    --white: #121A29;
+    --ink-900: #FFFFFF;
+    --ink-700: #E4E7EC;
+    --ink-500: #9098A8;
+    --ink-400: #6B7280;
+    --ink-300: #363C54;
+    --line: #1D2C42;
+
+    --amber-100: #2E230F;
+    --rose-100: #2E1512;
+    --teal-100: #0E262A;
+  }
+
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink-900); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--teal-600); outline-offset: 2px; }
+
+  .app { display: grid; grid-template-columns: 252px 1fr; min-height: 100vh; }
+
+  .sidebar {
+    background: var(--white); color: var(--ink-700); padding: 22px 14px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+    border-right: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 20px 8px; margin-bottom: 16px; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(155deg, var(--teal-400), var(--teal-600)); box-shadow: 0 4px 12px -4px rgba(13,148,136,0.5); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; }
+  .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: -0.2px; color: var(--ink-900); line-height: 1.15; }
+  .brand-sub { font-size: 9.5px; color: var(--teal-600); text-transform: uppercase; letter-spacing: 1.3px; font-weight: 700; margin-top: 2px; }
+  .org-card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
+  .org-card-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 3px; }
+  .org-card-name { font-size: 13px; font-weight: 700; color: var(--ink-900); margin-bottom: 6px; }
+  .org-badge { display: inline-block; font-size: 10px; font-weight: 700; color: var(--teal-700); background: var(--teal-100); padding: 2px 8px; border-radius: 999px; }
+  .nav-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.1px; font-weight: 700; color: var(--ink-400); padding: 0 12px; margin: 16px 0 7px; }
+  .nav-group-label:first-of-type { margin-top: 0; }
+  .nav-item { text-decoration: none; display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 9px; font-size: 13.5px; font-weight: 500; color: var(--ink-500); background: transparent; border: none; width: 100%; text-align: left; transition: background 0.15s ease, color 0.15s ease; }
+  .nav-item:hover { background: var(--bg); color: var(--ink-900); }
+  .nav-item.active { background: var(--teal-100); color: var(--teal-700); font-weight: 700; }
+  .nav-icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
+  .sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .avatar-sm { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(155deg, var(--teal-500), var(--teal-700)); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #06110F; flex-shrink: 0; }
+  .footer-name { font-size: 12.5px; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
+  .footer-role { font-size: 10.5px; color: var(--ink-400); }
+
+  .main { padding: 32px 42px 60px; max-width: 1000px; }
+  .topbar-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: var(--teal-600); margin-bottom: 6px; }
+  .topbar h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; letter-spacing: -0.6px; margin: 0 0 4px; color: var(--ink-900); }
+  .topbar h1 em { font-style: italic; color: var(--teal-600); font-weight: 800; }
+  .topbar-sub { font-size: 13.5px; color: var(--ink-500); margin-bottom: 24px; }
+
+  /* ---------------- Settings tabs (secondary nav) ---------------- */
+  .settings-tabs { display: flex; gap: 4px; background: var(--white); border: 1px solid var(--line); border-radius: 999px; padding: 4px; width: fit-content; margin-bottom: 24px; flex-wrap: wrap; }
+  .settings-tab { border: none; background: transparent; padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--ink-400); transition: all 0.15s ease; }
+  .settings-tab.active { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #FFFFFF; }
+
+  div[data-panel] { display: none; }
+  div[data-panel].active { display: block; }
+
+  .panel { background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-card); padding: 24px 28px; margin-bottom: 18px; }
+  .settings-group-head { display: flex; align-items: center; gap: 12px; margin: 34px 0 16px; }
+  .settings-group-head:first-of-type { margin-top: 8px; }
+  .settings-group-icon { width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(155deg, var(--teal-400), var(--teal-600)); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 6px 14px -6px rgba(13,148,136,0.5); }
+  .settings-group-icon svg { width: 17px; height: 17px; color: #fff; }
+  .settings-group-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--ink-900); margin: 0; letter-spacing: -0.2px; }
+  .pricing-option:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -16px rgba(14,16,24,0.18); }
+  .panel h3 { font-family: var(--font-display); font-weight: 700; font-size: 15.5px; margin: 0 0 4px; color: var(--ink-900); }
+  .panel .panel-sub { font-size: 12.5px; color: var(--ink-500); margin: 0 0 18px; }
+
+  /* ---------------- Integration rows ---------------- */
+  .integration-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .integration-row:last-child { border-bottom: none; }
+  .integration-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #FFFFFF; }
+  .integration-info { flex: 1; min-width: 0; }
+  .integration-name { font-size: 13.5px; font-weight: 700; color: var(--ink-900); display: flex; align-items: center; gap: 8px; }
+  .integration-status { font-size: 12px; margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+  .integration-status.connected { color: var(--teal-700); }
+  .integration-status.disconnected { color: var(--ink-400); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.connected { background: var(--teal-500); }
+  .status-dot.disconnected { background: var(--ink-300); }
+  .integration-email { font-size: 11px; color: var(--ink-400); background: var(--bg); border: 1px solid var(--line); padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+
+  .btn-connect { font-size: 12.5px; font-weight: 700; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); color: var(--ink-700); white-space: nowrap; }
+  .btn-connect.primary { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #FFFFFF; border: none; }
+  .btn-connect.danger { color: var(--rose-600); border-color: rgba(213,73,58,0.3); }
+
+  /* ---------------- Toggle switch ---------------- */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); gap: 16px; }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 13px; font-weight: 600; color: var(--ink-900); }
+  .toggle-desc { font-size: 12px; color: var(--ink-500); margin-top: 2px; }
+  .switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-track { position: absolute; inset: 0; background: var(--ink-300); border-radius: 999px; cursor: pointer; transition: background 0.15s ease; }
+  .switch-track::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #FFFFFF; border-radius: 50%; transition: transform 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .switch input:checked + .switch-track { background: var(--teal-600); }
+  .switch input:checked + .switch-track::before { transform: translateX(18px); }
+
+  .info-banner { display: flex; gap: 10px; background: var(--teal-100); border: 1px solid rgba(13,148,136,0.2); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12.5px; color: var(--teal-700); line-height: 1.5; margin-top: 14px; }
+  .info-banner svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ---------------- Meeting types ---------------- */
+  .type-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .type-row:last-child { border-bottom: none; }
+  .type-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .type-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--ink-900); }
+  .type-edit { font-size: 12px; font-weight: 600; color: var(--teal-700); background: transparent; border: none; }
+  .add-type-btn { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--teal-700); background: var(--teal-100); border: 1px solid rgba(13,148,136,0.2); padding: 8px 14px; border-radius: 999px; margin-top: 4px; }
+  .add-type-btn svg { width: 13px; height: 13px; }
+
+  /* ---------------- Account ---------------- */
+  .account-row { display: flex; align-items: center; gap: 14px; }
+  .account-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(155deg, var(--teal-500), var(--teal-700)); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 19px; color: #FFFFFF; flex-shrink: 0; }
+  .account-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--ink-900); }
+  .account-email { font-size: 12.5px; color: var(--ink-500); margin-top: 2px; }
+
+  .field-group { margin-top: 18px; }
+  .field-label { font-size: 11.5px; font-weight: 700; color: var(--ink-700); margin-bottom: 6px; display: block; }
+  .field-input { width: 100%; font-family: inherit; font-size: 13px; padding: 10px 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--ink-900); background: var(--bg); }
+  .field-input:focus { outline: none; border-color: var(--teal-500); box-shadow: 0 0 0 4px var(--teal-muted); background: var(--white); }
+
+  /* ---------------- Subscription ---------------- */
+  .plan-card { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+  .plan-name-row { display: flex; align-items: center; gap: 10px; }
+  .plan-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--ink-900); }
+  .plan-price { font-size: 12.5px; color: var(--ink-500); }
+  .plan-badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: var(--teal-100); color: var(--teal-700); padding: 4px 10px; border-radius: 999px; }
+
+  .usage-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  .usage-cell { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px 15px; }
+  .usage-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.7px; font-weight: 700; color: var(--ink-400); margin-bottom: 6px; }
+  .usage-value { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--ink-900); }
+  .usage-bar-track { height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 8px; }
+  .usage-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--teal-400), var(--teal-600)); }
+
+  .btn-danger-outline { font-size: 12.5px; font-weight: 700; color: var(--rose-600); background: var(--white); border: 1px solid rgba(213,73,58,0.3); padding: 9px 16px; border-radius: 999px; }
+  .btn-teal-outline { font-size: 12.5px; font-weight: 700; color: var(--teal-700); background: var(--white); border: 1px solid rgba(13,148,136,0.3); padding: 9px 16px; border-radius: 999px; }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; flex-direction: row; align-items: center; padding: 14px 16px; overflow-x: auto; }
+    .brand { border: none; padding: 0; margin: 0 16px 0 0; }
+    .nav-group-label { display: none; }
+    .sidebar-footer { display: none; }
+    .sidebar > div:not(.brand) { display: flex; gap: 4px; }
+    .main { padding: 22px 16px 50px; }
+    .usage-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+</head>
+<body>
+
+<div id="viewAsBanner" style="display:none;position:sticky;top:0;z-index:200;background:linear-gradient(90deg,#1A1B2E,#0E1018);color:#fff;padding:10px 24px;font-size:12.5px;font-weight:600;display:none;align-items:center;justify-content:center;gap:10px;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14" style="color:#2DD4BF;"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+  <span>Viewing as <strong id="viewAsName">—</strong> — this is exactly what they see.</span>
+  <button id="exitViewAsBtn" style="background:rgba(255,255,255,0.12);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;margin-left:6px;">Exit Preview</button>
+</div>
+
+<div id="viewAsModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(14,16,24,0.55);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:18px;padding:26px 28px;width:340px;max-width:90vw;box-shadow:0 30px 60px -20px rgba(14,16,24,0.4);">
+    <div style="font-family:'Geist',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px;color:#12141F;">View As</div>
+    <div style="font-size:12.5px;color:#6B7280;margin-bottom:16px;">See exactly what an agent sees in the app.</div>
+    <div id="viewAsAgentList" style="max-height:280px;overflow-y:auto;"></div>
+    <button id="closeViewAsModalBtn" style="width:100%;margin-top:14px;background:none;border:1px solid #E4E7EC;color:#6B7280;font-weight:700;font-size:12.5px;padding:10px;border-radius:10px;">Cancel</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Real fix — the "view as" shim must run before ANY other script on
+  // the page reads the advisor ID, so it patches localStorage.getItem
+  // itself rather than requiring every page's fetch logic to be touched
+  // individually.
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  if (viewingAsId) {
+    var originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === 'grwth_advisor_id') return viewingAsId;
+      return originalGetItem.call(this, key);
+    };
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var apiBase = window.GRWTH_API_BASE || Storage.prototype.getItem.call(localStorage, 'grwth_api_base') || 'https://api.grwthtech.com';
+  var realAdvisorId = Storage.prototype.getItem.call(localStorage, 'grwth_advisor_id');
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  var viewingAsName = sessionStorage.getItem('grwth_viewing_as_name');
+
+  if (viewingAsId && viewingAsName) {
+    document.getElementById('viewAsName').textContent = viewingAsName;
+    document.getElementById('viewAsBanner').style.display = 'flex';
+  }
+
+  document.getElementById('exitViewAsBtn').addEventListener('click', function() {
+    sessionStorage.removeItem('grwth_viewing_as_id');
+    sessionStorage.removeItem('grwth_viewing_as_name');
+    window.location.reload();
+  });
+
+  // Only owner/admin/super admin ever see the toggle at all.
+  if (!realAdvisorId || viewingAsId) return;
+  fetch(apiBase + '/api/grwth-coach/team/view-as-options', { credentials: 'include', headers: { 'x-advisor-id': realAdvisorId } })
+    .then(function(r) { return r.json(); })
+    .then(function(options) {
+      if (!Array.isArray(options) || options.length === 0) return;
+
+      var footer = document.querySelector('.sidebar-footer');
+      if (!footer) return;
+      var viewAsBtn = document.createElement('button');
+      viewAsBtn.textContent = 'View As';
+      viewAsBtn.style.cssText = 'margin-left:auto;background:var(--teal-100,#E3F5F2);border:none;color:var(--teal-700,#0B7A70);font-size:11px;font-weight:700;cursor:pointer;padding:6px 10px;border-radius:999px;font-family:inherit;';
+      footer.appendChild(viewAsBtn);
+
+      var roleLabel = { agency_owner: 'Agency Owner', admin: 'Admin', advisor: 'Agent' };
+      document.getElementById('viewAsAgentList').innerHTML = options.map(function(a) {
+        return '<button data-view-as-id="' + a.id + '" data-view-as-name="' + a.name.replace(/"/g, '&quot;') + '" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;background:none;border:none;padding:10px 8px;border-radius:10px;cursor:pointer;font-family:inherit;">' +
+          '<span style="font-size:13.5px;font-weight:600;color:#12141F;">' + a.name + '</span>' +
+          '<span style="font-size:10.5px;color:#9098A8;">' + (roleLabel[a.role] || a.role) + '</span>' +
+        '</button>';
+      }).join('');
+
+      viewAsBtn.addEventListener('click', function() {
+        document.getElementById('viewAsModalOverlay').style.display = 'flex';
+      });
+      document.getElementById('closeViewAsModalBtn').addEventListener('click', function() {
+        document.getElementById('viewAsModalOverlay').style.display = 'none';
+      });
+      document.querySelectorAll('[data-view-as-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          sessionStorage.setItem('grwth_viewing_as_id', btn.dataset.viewAsId);
+          sessionStorage.setItem('grwth_viewing_as_name', btn.dataset.viewAsName);
+          window.location.reload();
+        });
+      });
+    })
+    .catch(function() {});
+});
+</script>
+
+
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="grwth-icon.png" alt="GRWTH Coach" class="brand-mark" style="object-fit:cover;">
+      <div>
+        <div class="brand-name">GRWTH Coach</div>
+        <div class="brand-sub">Coach IQ Engine</div>
+      </div>
+    </div>
+
+    <div class="org-card">
+      <div class="org-card-label">Organization</div>
+      <div class="org-card-name" id="sidebarOrgName">Loading…</div>
+      <span class="org-badge" id="sidebarOrgBadge">—</span>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Overview</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a href="meetings.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 10l4.55-2.3a1 1 0 0 1 1.45.9v6.8a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg>
+        Meetings
+      </a>
+      <a href="coaching-reports.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5a1 1 0 0 0 1 1h5"/><path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 13h6M9 17h4"/></svg>
+        Coaching Reports
+      </a>
+      <a href="analytics.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l3-3 4 4 5-6 6 6"/><path d="M3 19h18"/></svg>
+        Analytics
+      </a>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Team</div>
+      <a href="team-performance.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15 12.2a5.2 5.2 0 0 1 6.5 5"/></svg>
+        Team Performance
+      </a>
+      <a href="training-library.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V6a2 2 0 0 1 2-2h9l5 5v10.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M8 12h8M8 16h5"/></svg>
+        Training Library
+      </a>
+      <a href="natural-selling-vault.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+        Natural Selling Vault
+      </a>
+      <a href="roleplay.html" class="nav-item" style="position:relative;">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+        Role-Play
+        <span id="roleplayReadyDot" style="display:none;width:7px;height:7px;border-radius:50%;background:#14B8A6;box-shadow:0 0 0 3px rgba(20,184,166,0.25);margin-left:auto;flex-shrink:0;"></span>
+      </a>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Account</div>
+      <a href="settings.html" class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.96a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6c.61.26 1.34.16 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.26.61.85 1.04 1.56 1.04H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/></svg>
+        Settings
+      </a>
+      <a href="ask-grwth.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        Ask GRWTH
+      </a>
+    </div>
+
+    <div id="superAdminNavGroup" style="display:none;">
+      <div class="nav-group-label">System</div>
+      <a href="super-admin.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/></svg>
+        Super Admin
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="avatar-sm" id="sidebarAvatar">LK</div>
+      <div>
+        <div class="footer-name" id="sidebarFooterName">Logan Knecht</div>
+        <div class="footer-role" id="sidebarFooterRole">Agency Owner</div>
+      </div>
+    </div>
+  </aside>
+<script>
+  // Populate the sidebar identity block with whoever's actually logged in —
+  // this used to be hardcoded to one person regardless of who signed in.
+  (function () {
+    localStorage.setItem('grwth_settings_visited', '1');
+    const name = localStorage.getItem('grwth_advisor_name');
+    const role = localStorage.getItem('grwth_advisor_role');
+    const nameEl = document.getElementById('sidebarFooterName');
+    const roleEl = document.getElementById('sidebarFooterRole');
+    const avatarEl = document.getElementById('sidebarAvatar');
+    const roleLabel = role === 'agency_owner' ? 'Agency Owner' : role === 'admin' ? 'Admin' : 'Agent';
+    if (name && nameEl) nameEl.textContent = name;
+    if (role && roleEl) roleEl.textContent = roleLabel;
+    if (name && avatarEl) {
+      avatarEl.textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    }
+    const cachedPhoto = localStorage.getItem('grwth_advisor_photo');
+    if (cachedPhoto && avatarEl) {
+      avatarEl.style.backgroundImage = `url(${cachedPhoto})`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.textContent = '';
+    }
+    const orgNameEl = document.getElementById('sidebarOrgName');
+    const orgBadgeEl = document.getElementById('sidebarOrgBadge');
+    if (orgBadgeEl) orgBadgeEl.textContent = roleLabel;
+    if (orgNameEl) orgNameEl.textContent = 'GRWTH TECH';
+
+    // Fetch the REAL organization name (and confirm role label) from the
+    // API — the agency owner can rename their organization, and every
+    // team member should see that real name, not just whatever was
+    // cached at their own last login.
+    const orgApiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+    const orgAdvisorId = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+    if (orgAdvisorId && orgNameEl) {
+      fetch(`${orgApiBase}/api/grwth-coach/me`, { credentials: 'include', headers: { 'x-advisor-id': orgAdvisorId } })
+        .then(r => r.json())
+        .then(me => {
+          orgNameEl.textContent = me.teamName || 'GRWTH TECH';
+          if (orgBadgeEl && me.roleLabel) orgBadgeEl.textContent = me.roleLabel;
+          if (me.photoUrl && avatarEl) {
+            avatarEl.style.backgroundImage = `url(${me.photoUrl})`;
+            avatarEl.style.backgroundSize = 'cover';
+            avatarEl.style.backgroundPosition = 'center';
+            avatarEl.textContent = '';
+            localStorage.setItem('grwth_advisor_photo', me.photoUrl);
+          } else if (avatarEl) {
+            avatarEl.style.backgroundImage = '';
+            localStorage.removeItem('grwth_advisor_photo');
+          }
+        })
+        .catch(() => {});
+    }
+  })();
+
+  // Real Logout — previously there was no way to switch accounts without
+  // manually clearing browser storage.
+  (function () {
+    const footer = document.querySelector('.sidebar-footer');
+    if (!footer) return;
+    const themeBtn = document.createElement('button');
+    themeBtn.id = 'themeToggleBtn';
+    themeBtn.title = 'Toggle dark mode';
+    themeBtn.style.cssText = 'margin-left:auto;border:1px solid var(--line);background:var(--bg);color:var(--ink-700);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;';
+    themeBtn.innerHTML =
+      '<svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' +
+      '<svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="display:none;"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>';
+    function applyThemeIcon() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.getElementById('themeIconSun').style.display = isDark ? 'none' : 'block';
+      document.getElementById('themeIconMoon').style.display = isDark ? 'block' : 'none';
+    }
+    themeBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('grwth_theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('grwth_theme', 'dark');
+      }
+      applyThemeIcon();
+    });
+
+    const logoutBtn = document.createElement('button');
+    logoutBtn.textContent = 'Log Out';
+    logoutBtn.style.cssText = 'background:none;border:none;color:var(--ink-500);font-size:11px;font-weight:600;cursor:pointer;padding:4px 8px;font-family:inherit;';
+    logoutBtn.addEventListener('mouseenter', () => { logoutBtn.style.color = '#2DD4BF'; });
+    logoutBtn.addEventListener('mouseleave', () => { logoutBtn.style.color = 'var(--ink-500)'; });
+    logoutBtn.addEventListener('click', async () => {
+      // Real fix — actually calls the server to clear the real session
+      // cookie, not just clearing localStorage (which never secured
+      // anything in the first place, and left the real cookie valid).
+      try {
+        await fetch(`${API_BASE}/api/grwth-coach/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (err) {
+        console.warn('[GRWTH Coach] Logout request failed:', err.message);
+      }
+      localStorage.removeItem('grwth_advisor_id');
+      localStorage.removeItem('grwth_advisor_name');
+      localStorage.removeItem('grwth_advisor_email');
+      localStorage.removeItem('grwth_advisor_role');
+      window.location.href = 'login.html';
+    });
+    footer.style.display = 'flex';
+    footer.style.alignItems = 'center';
+    footer.appendChild(themeBtn);
+    footer.appendChild(logoutBtn);
+    applyThemeIcon();
+  })();
+</script>
+
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="topbar-eyebrow">Coach IQ · Configuration</div>
+    <h1>Everything, <em>configured your way.</em></h1>
+    <div class="topbar-sub">Integrations, recording rules, account, and billing.</div>
+
+    <div class="settings-tabs" id="settingsTabs">
+      <button class="settings-tab active" data-panel="integrations">Integrations</button>
+      <button class="settings-tab" data-panel="meetings">Meeting Recording</button>
+      <button class="settings-tab" data-panel="sharing" id="sharingTabBtn" style="display:none;">Sharing</button>
+      <button class="settings-tab" data-panel="account">Account</button>
+      <button class="settings-tab" data-panel="subscription">Billing & Plans</button>
+    </div>
+
+    <!-- INTEGRATIONS -->
+    <div data-panel="integrations" class="active">
+      <div class="panel">
+        <h3>Calendar & Conferencing</h3>
+        <p class="panel-sub">Connect your calendar so GRWTH Coach automatically joins and records eligible meetings.</p>
+
+        <div class="integration-row" data-provider="google_calendar">
+          <div class="integration-icon" style="background:#4285F4;">G</div>
+          <div class="integration-info">
+            <div class="integration-name">Google Calendar</div>
+            <div class="integration-status disconnected" id="status-google_calendar"><span class="status-dot disconnected"></span>Checking…</div>
+          </div>
+          <button class="btn-connect primary" id="btn-google_calendar">Connect</button>
+        </div>
+
+        <div class="integration-row" data-provider="outlook_calendar">
+          <div class="integration-icon" style="background:#0364B8;">O</div>
+          <div class="integration-info">
+            <div class="integration-name">Outlook Calendar</div>
+            <div class="integration-status disconnected" id="status-outlook_calendar"><span class="status-dot disconnected"></span>Checking…</div>
+          </div>
+          <button class="btn-connect primary" id="btn-outlook_calendar">Connect</button>
+        </div>
+
+        <div class="integration-row" data-provider="zoom">
+          <div class="integration-icon" style="background:#2D8CFF;">Z</div>
+          <div class="integration-info">
+            <div class="integration-name">Zoom</div>
+            <div class="integration-status disconnected" id="status-zoom"><span class="status-dot disconnected"></span>Checking…</div>
+            <div style="font-size:11px;color:var(--ink-400);margin-top:3px;">Zoom reuses whatever account you're already logged into in this browser — it won't prompt you to pick one. Log out of Zoom first at zoom.us if you need to connect a different account.</div>
+          </div>
+          <button class="btn-connect primary" id="btn-zoom">Connect</button>
+        </div>
+
+        <div class="integration-row" data-provider="teams">
+          <div class="integration-icon" style="background:#464EB8;">T</div>
+          <div class="integration-info">
+            <div class="integration-name">Microsoft Teams</div>
+            <div class="integration-status disconnected"><span class="status-dot disconnected"></span>Coming soon</div>
+          </div>
+          <button class="btn-connect" disabled style="opacity:0.5;cursor:not-allowed;">Connect</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Chrome Extension</h3>
+        <p class="panel-sub">Send a recording bot to any meeting with one click, right from your browser — installs once, works automatically with your account, no manual setup.</p>
+
+        <div class="integration-row">
+          <div class="integration-icon" style="background:#0E1018;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2.5" width="18" height="18"><circle cx="12" cy="12" r="7"/></svg>
+          </div>
+          <div class="integration-info">
+            <div class="integration-name">GRWTH Coach Extension</div>
+            <div class="integration-status" style="color:var(--ink-500);"><span class="status-dot disconnected"></span>Not installed on this browser</div>
+          </div>
+          <a href="https://chromewebstore.google.com/detail/grwth-coach/bgpcbmncokodehklkbdfcgalhbpjocll" target="_blank" rel="noopener" class="btn-connect primary" style="text-decoration:none;display:inline-flex;align-items:center;">Install</a>
+        </div>
+      </div>
+
+      <div class="panel" id="integrationBanner" style="display:none;"></div>
+    </div>
+
+    <!-- MEETING RECORDING -->
+    <div data-panel="meetings">
+      <div class="panel">
+        <h3>Recording Preferences</h3>
+        <p class="panel-sub">Control when GRWTH Coach joins and records automatically.</p>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Record all meetings on my calendar</div>
+            <div class="toggle-desc">GRWTH Coach joins automatically unless a meeting type below is excluded.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="prefRecordAll" checked><span class="switch-track"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Email a recording to attendees</div>
+            <div class="toggle-desc">Attendees with their own GRWTH Coach account get a link regardless of this setting.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="prefEmailRecording"><span class="switch-track"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto-generate Coach IQ score after every call</div>
+            <div class="toggle-desc">Turn off to review and score manually instead.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="prefAutoScore" checked><span class="switch-track"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto-flag strong calls for the Training Library</div>
+            <div class="toggle-desc">Calls scoring A on any sub-skill are suggested for the library automatically.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="prefAutoFlagLibrary" checked><span class="switch-track"></span></label>
+        </div>
+      </div>
+
+      <div class="panel" id="homeworkAutoAssignPanel" style="display:none;">
+        <h3>Weekly Training Homework</h3>
+        <p class="panel-sub">Applies to your whole team, not just your own account.</p>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Automatically assign weekly homework</div>
+            <div class="toggle-desc">Every Monday, agents with at least 5 days of real call history get a new Vault lesson + quiz. You can always assign one manually from Team Performance regardless of this setting.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="prefHomeworkAutoAssign"><span class="switch-track"></span></label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 id="meetingTypesHeading">Meeting Types</h3>
+        <p class="panel-sub">Each type sets a default for whether GRWTH Coach auto-records that kind of meeting. Assign a type when adding a meeting.</p>
+
+        <div id="meetingTypesList"></div>
+
+        <button class="add-type-btn" id="addTypeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+          Add Type
+        </button>
+      </div>
+
+      <!-- MEETING TYPE EDITOR MODAL (shared for add + edit) -->
+      <div id="typeModalOverlay" style="position:fixed;inset:0;background:rgba(14,16,24,0.5);display:none;align-items:center;justify-content:center;z-index:60;">
+        <div style="background:var(--white);border-radius:var(--radius);padding:24px 26px;width:360px;max-width:90vw;box-shadow:0 30px 70px -20px rgba(14,16,24,0.4);">
+          <div style="font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:16px;" id="typeModalHeading">Add Meeting Type</div>
+
+          <label style="font-size:11.5px;font-weight:700;color:var(--ink-700);display:block;margin-bottom:5px;">Name</label>
+          <input id="typeNameInput" type="text" placeholder="e.g. Discovery Call" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;font-family:inherit;font-size:13px;box-sizing:border-box;">
+
+          <label style="font-size:11.5px;font-weight:700;color:var(--ink-700);display:block;margin-bottom:5px;">Color</label>
+          <input id="typeColorInput" type="color" value="#0D9488" style="width:100%;height:38px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;padding:2px;">
+
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:18px;">
+            <input id="typeAutoRecordInput" type="checkbox" checked>
+            Auto-record meetings of this type by default
+          </label>
+
+          <div id="typeModalError" style="display:none;color:var(--rose-600);font-size:12px;margin-bottom:10px;"></div>
+
+          <div style="display:flex;gap:8px;">
+            <button id="cancelTypeModal" style="flex:1;background:var(--white);border:1px solid var(--line);color:var(--ink-700);padding:10px;border-radius:8px;font-size:13px;font-weight:600;">Cancel</button>
+            <button id="saveTypeModal" style="flex:1;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:700;">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHARING -->
+    <div data-panel="sharing">
+      <div class="panel">
+        <h3>Shared with Teammates</h3>
+        <p class="panel-sub">Calls explicitly shared internally — revoking removes it from their "Shared With Me" tab immediately.</p>
+        <div id="internalSharesList" style="font-size:13px;color:var(--ink-400);">Loading…</div>
+      </div>
+      <div class="panel">
+        <h3>External Share Links</h3>
+        <p class="panel-sub">Public links sent outside your team — revoking a link immediately breaks it for anyone who has it.</p>
+        <div id="externalSharesList" style="font-size:13px;color:var(--ink-400);">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ACCOUNT -->
+    <div data-panel="account">
+      <div class="panel">
+        <h3>Personal Information</h3>
+        <div class="account-row">
+          <div class="account-avatar" id="accountAvatar" style="position:relative;cursor:pointer;background-size:cover;background-position:center;" onclick="document.getElementById('photoUploadInput').click()">
+            <span id="accountAvatarInitials">LK</span>
+            <div style="position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="20" height="20"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+          </div>
+          <input type="file" id="photoUploadInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
+          <div id="cropModalOverlay" style="position:fixed;inset:0;background:rgba(14,16,24,0.6);display:none;align-items:center;justify-content:center;z-index:100;">
+            <div style="background:var(--white);border-radius:var(--radius);padding:24px;width:420px;max-width:92vw;box-shadow:0 30px 70px -20px rgba(14,16,24,0.4);">
+              <h3 style="margin:0 0 4px;font-size:16px;font-weight:800;">Adjust your photo</h3>
+              <p style="margin:0 0 16px;font-size:12.5px;color:var(--ink-500);">Drag to reposition, use the corners to zoom or resize the crop area.</p>
+              <div style="width:100%;height:320px;background:#000;border-radius:12px;overflow:hidden;">
+                <img id="cropImage" style="max-width:100%;display:block;">
+              </div>
+              <div style="display:flex;gap:10px;margin-top:18px;">
+                <button id="cropCancelBtn" style="flex:1;background:none;border:1px solid var(--line);color:var(--ink-700);padding:11px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">Cancel</button>
+                <button id="cropSaveBtn" style="flex:1;background:var(--teal-600);border:none;color:#fff;padding:11px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">Save photo</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="account-name" id="accountNameDisplay">Logan Knecht</div>
+            <div class="account-email" id="accountEmailDisplay">knechtlogan@gmail.com</div>
+            <div id="photoUploadStatus" style="font-size:11.5px;color:var(--ink-500);margin-top:4px;">Click your photo to upload a new one</div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Display Name</label>
+          <input class="field-input" type="text" id="accountNameInput" value="Logan Knecht">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Primary Email</label>
+          <input class="field-input" type="email" id="accountEmailInput" value="knechtlogan@gmail.com" readonly style="background:var(--bg);cursor:not-allowed;" title="Email changes aren't supported yet">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Your GRWTH Coach Bot's Name</label>
+          <input class="field-input" type="text" id="botNameInput" value="GRWTH Coach" maxlength="40" placeholder="GRWTH Coach">
+          <div style="font-size:11.5px;color:var(--ink-400);margin-top:4px;">This is the name your bot shows as when it auto-joins your meetings.</div>
+        </div>
+        <div class="field-group" id="orgNameFieldGroup" style="display:none;">
+          <label class="field-label">Organization Name</label>
+          <input class="field-input" type="text" id="orgNameInput" value="" maxlength="60" placeholder="Your organization's name">
+          <div style="font-size:11.5px;color:var(--ink-400);margin-top:4px;">Shown to your whole team in their sidebar. Only you, as agency owner, can change this.</div>
+        </div>
+        <div class="field-group" id="hideProfileFieldGroup" style="display:none;">
+          <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+            <div>
+              <div class="field-label" style="margin-bottom:2px;">Hide My Profile from the Team</div>
+              <div style="font-size:11.5px;color:var(--ink-400);">Keeps your own scores and videos out of the agent-facing leaderboard view.</div>
+            </div>
+            <input type="checkbox" id="hideProfileToggle" style="width:20px;height:20px;accent-color:var(--teal-600);flex-shrink:0;margin-left:16px;">
+          </label>
+        </div>
+        <button class="btn-teal-outline" id="saveProfileBtn" style="margin-top:6px;">Save Changes</button>
+        <span id="saveProfileNote" style="display:none;font-size:12px;color:var(--teal-700);font-weight:600;margin-left:10px;">Saved.</span>
+      </div>
+
+      <div class="panel" id="teamPanel" style="display:none;">
+        <h3>Team Members</h3>
+        <p class="panel-sub">Invite teammates into this agency — they'll share this same workspace, not get one of their own.</p>
+
+        <div style="background:var(--teal-100);border-radius:10px;padding:14px 16px;margin-bottom:18px;">
+          <div style="font-size:12.5px;font-weight:700;color:var(--teal-700);margin-bottom:6px;">Or share your team join link</div>
+          <div style="font-size:11.5px;color:var(--ink-500);margin-bottom:10px;">Anyone with this link can sign up directly into your agency — no individual email invite needed. They'll sign up and pay for themselves.</div>
+          <div style="display:flex;gap:8px;">
+            <input id="teamJoinLinkInput" readonly style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-family:var(--font-mono,monospace);background:var(--white);">
+            <button id="copyTeamJoinLinkBtn" style="background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:700;font-size:12.5px;white-space:nowrap;cursor:pointer;">Copy</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input id="inviteEmailInput" type="email" placeholder="teammate@example.com" style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;">
+          <select id="inviteRoleInput" style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;">
+            <option value="advisor">Agent</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button id="sendInviteBtn" style="background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px;white-space:nowrap;">Invite</button>
+        </div>
+        <div id="inviteError" style="display:none;color:var(--rose-600);font-size:12px;margin-bottom:12px;"></div>
+        <div id="inviteLinkBox" style="display:none;background:var(--teal-100, #E3F5F2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;">
+          <div style="font-weight:700;color:var(--teal-700);margin-bottom:6px;">Invitation created — no email is sent automatically yet, copy this link and send it yourself:</div>
+          <div style="display:flex;gap:8px;">
+            <input id="inviteLinkOutput" readonly style="flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:6px;font-family:var(--font-mono);font-size:11px;">
+            <button id="copyInviteLinkBtn" style="background:var(--teal-700);color:#fff;border:none;padding:7px 14px;border-radius:6px;font-size:11.5px;font-weight:700;">Copy</button>
+          </div>
+        </div>
+
+        <div id="invitationsList"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Alternate Emails</h3>
+        <p class="panel-sub">No alternate emails added yet. Add one to receive notifications at multiple addresses.</p>
+        <button class="btn-teal-outline">+ Add Email</button>
+      </div>
+
+      <div class="panel" id="hideScoresPanel" style="display:none;">
+        <h3>Leaderboard Visibility</h3>
+        <p class="panel-sub">Hide your own Coach IQ scores from the team leaderboard and rankings. Available to admins and the super admin only — agents can't hide their own scores.</p>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="hideScoresToggle" style="width:18px;height:18px;cursor:pointer;">
+          <span style="font-size:13px;font-weight:600;color:var(--ink-700);">Hide my scores from the team</span>
+        </label>
+      </div>
+
+      <div class="panel" id="trainingLibraryPanel" style="display:none;">
+        <h3>Training Library Access</h3>
+        <p class="panel-sub">Only agency owners, admins, and the super admin have their A-grade call moments added to the Training Library automatically. Turn this on for a specific agent below to include their calls too.</p>
+        <div id="trainingEligibilityList" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Danger Zone</h3>
+        <p class="panel-sub">Deleting your account removes all recordings, transcripts, and coaching history permanently.</p>
+        <button class="btn-danger-outline" id="deleteAccountBtn">Delete Account</button>
+      </div>
+    </div>
+
+    <!-- SUBSCRIPTION -->
+    <div data-panel="subscription">
+      <div class="panel">
+        <h3>GRWTH Coach</h3>
+        <p class="panel-sub">Full Coach access — call review, coaching, the Natural Selling Vault, and reporting.</p>
+        <div id="coachStatusCard"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+          <div class="pricing-option" style="border:1px solid var(--line);border-radius:14px;padding:20px;transition:transform 0.15s ease, box-shadow 0.15s ease;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-400);margin-bottom:6px;">Monthly</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:28px;margin-bottom:12px;letter-spacing:-0.4px;">$77<span style="font-size:13px;font-weight:600;color:var(--ink-400);">/mo</span></div>
+            <button class="btn-teal-outline" data-checkout-plan="coach_monthly" style="width:100%;">Subscribe</button>
+          </div>
+          <div class="pricing-option" style="border:1.5px solid var(--teal-500);border-radius:14px;padding:20px;background:var(--teal-100);position:relative;transition:transform 0.15s ease, box-shadow 0.15s ease;">
+            <div style="position:absolute;top:-10px;right:14px;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;padding:4px 10px;border-radius:999px;box-shadow:0 4px 10px -3px rgba(13,148,136,0.5);">Best Value</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--teal-700);margin-bottom:6px;">Annual — 2 months free</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:28px;margin-bottom:12px;letter-spacing:-0.4px;">$770<span style="font-size:13px;font-weight:600;color:var(--ink-500);">/yr</span></div>
+            <button class="btn-teal-outline" data-checkout-plan="coach_annual" style="width:100%;background:var(--teal-600);color:#fff;border-color:var(--teal-600);">Subscribe</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Role-Play Add-On</h3>
+        <p class="panel-sub">Live AI voice practice calls — 10 sessions per week included, separate from Coach.</p>
+        <div id="roleplayAddonStatus" style="display:none;font-size:12.5px;font-weight:600;color:var(--teal-700);background:var(--teal-100);padding:10px 14px;border-radius:8px;margin-bottom:12px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+          <div style="border:1px solid var(--line);border-radius:12px;padding:18px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-400);margin-bottom:6px;">Weekly Add-On</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin-bottom:12px;">$20<span style="font-size:13px;font-weight:600;color:var(--ink-400);">/mo</span></div>
+            <button class="btn-teal-outline" data-checkout-plan="roleplay_addon" style="width:100%;">Subscribe</button>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:12px;padding:18px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-400);margin-bottom:6px;">Credit Pack — 10 sessions</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin-bottom:12px;">$10<span style="font-size:13px;font-weight:600;color:var(--ink-400);"> one-time</span></div>
+            <button class="btn-teal-outline" data-checkout-plan="roleplay_credit_pack" style="width:100%;">Buy Credits</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="agencyBillingPanel" style="display:none;">
+        <h3>Agency Owner Command Center</h3>
+        <p class="panel-sub">Full agency oversight — team performance, coaching reports across every agent, and up to 5 admin seats.</p>
+        <div id="agencyOwnerStatusCard"></div>
+        <div style="border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:14px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-400);margin-bottom:6px;">Monthly</div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin-bottom:12px;">$297<span style="font-size:13px;font-weight:600;color:var(--ink-400);">/mo</span></div>
+          <button class="btn-teal-outline" data-checkout-plan="agency_owner" style="width:100%;">Subscribe</button>
+        </div>
+
+        <div style="height:16px;"></div>
+        <h3 style="font-size:14px;">Additional Admin Seats</h3>
+        <p class="panel-sub">$97/mo per seat, maximum 5 per agency. Purchase a seat before inviting an admin in Team settings.</p>
+        <div style="border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:14px;max-width:260px;">
+          <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin-bottom:12px;">$97<span style="font-size:13px;font-weight:600;color:var(--ink-400);">/mo per seat</span></div>
+          <button class="btn-teal-outline" data-checkout-plan="agency_admin_seat" style="width:100%;">Buy Admin Seat</button>
+        </div>
+      </div>
+
+      <div id="billingStatusMsg" style="font-size:12.5px;color:var(--ink-500);margin-top:4px;"></div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* =========================================================================
+   DEVELOPER NOTE — this page is UI-only right now. None of the buttons/
+   toggles below call a real endpoint yet:
+   - Integration Connect/Disconnect buttons need real OAuth flows
+     (Google Calendar, Outlook, Zoom) — none
+     of that is built in the backend. This is a genuine multi-day project
+     per integration, not a quick wire-up.
+   - Recording Preference toggles and Meeting Type CRUD need PATCH/POST
+     endpoints against the Agent and MeetingType models
+     (see prisma/schema.prisma) — not built yet.
+   - Billing & Plans should pull from Stripe directly (you already have
+     Stripe connected elsewhere) rather than being stored here.
+   See GRWTH-Coach-Backend-Spec.md, "Settings" section, for the full list.
+   ========================================================================= */
+document.getElementById('settingsTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.settings-tab');
+  if (!btn) return;
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('active', p.dataset.panel === btn.dataset.panel));
+});
+
+/* ---------------------------------------------------------------------
+   Live integration status + real Google Calendar OAuth wiring.
+   Falls back silently (leaves "Checking…" as-is) if no advisor ID is
+   configured or the backend isn't reachable — same resilience pattern
+   as every other page.
+--------------------------------------------------------------------- */
+const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+const ADVISOR_ID = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+
+async function fetchJSON(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include',
+    ...options,
+    headers: { 'x-advisor-id': ADVISOR_ID, ...(options.headers || {}) },
+  });
+  // Real fix — Zoom's Authorization Method requires the Direct Landing
+  // URL to route unauthenticated visitors to sign-in, then return them
+  // here after login (not just fail silently or show broken content).
+  // A 401 here means the session cookie is missing or invalid.
+  if (res.status === 401) {
+    window.location.href = `login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+    return new Promise(() => {}); // navigation is happening — never resolve, caller doesn't need to handle this
+  }
+  if (!res.ok) {
+    let message = `API ${res.status} on ${path}`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch (_) { /* body wasn't JSON, keep the generic message */ }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+function renderGoogleCalendarStatus(info) {
+  const statusEl = document.getElementById('status-google_calendar');
+  const btnEl = document.getElementById('btn-google_calendar');
+
+  if (info.status === 'connected') {
+    statusEl.className = 'integration-status connected';
+    statusEl.innerHTML = `<span class="status-dot connected"></span>Connected${info.connectedAs ? `<span class="integration-email">${info.connectedAs}</span>` : ''}`;
+    btnEl.textContent = 'Disconnect';
+    btnEl.className = 'btn-connect danger';
+    btnEl.onclick = disconnectGoogleCalendar;
+  } else {
+    statusEl.className = 'integration-status disconnected';
+    statusEl.innerHTML = `<span class="status-dot disconnected"></span>Not Connected`;
+    btnEl.textContent = 'Connect';
+    btnEl.className = 'btn-connect primary';
+    btnEl.onclick = connectGoogleCalendar;
+  }
+}
+
+function connectGoogleCalendar() {
+  if (!ADVISOR_ID) {
+    alert('No agent ID configured for this browser — set it via the Dashboard\'s dev config panel first.');
+    return;
+  }
+  window.location.href = `${API_BASE}/api/grwth-coach/integrations/google-calendar/connect?advisorId=${encodeURIComponent(ADVISOR_ID)}`;
+}
+
+async function disconnectGoogleCalendar() {
+  try {
+    await fetchJSON('/api/grwth-coach/integrations/google_calendar/disconnect', { method: 'POST' });
+    loadIntegrationStatus();
+
+(async function initHideScoresToggle() {
+  const role = localStorage.getItem('grwth_advisor_role');
+  const advisorId = localStorage.getItem('grwth_advisor_id');
+  if (!advisorId) return;
+  try {
+    const me = await fetchJSON('/api/grwth-coach/me');
+    const canHideScores = role === 'admin' || me.superAdmin === true;
+    if (!canHideScores) return;
+
+    const panel = document.getElementById('hideScoresPanel');
+    const toggle = document.getElementById('hideScoresToggle');
+    panel.style.display = 'block';
+    toggle.checked = !!me.hiddenFromTeamView;
+
+    toggle.addEventListener('change', async () => {
+      try {
+        await fetchJSON('/api/grwth-coach/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hiddenFromTeamView: toggle.checked }),
+        });
+      } catch (err) {
+        toggle.checked = !toggle.checked;
+        alert(`Couldn't update this setting: ${err.message}`);
+      }
+    });
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load hide-scores setting:', err.message);
+  }
+})();
+
+(async function initTrainingEligibilityList() {
+  const role = localStorage.getItem('grwth_advisor_role');
+  const advisorId = localStorage.getItem('grwth_advisor_id');
+  if (!advisorId) return;
+  try {
+    const me = await fetchJSON('/api/grwth-coach/me');
+    const canManage = role === 'agency_owner' || role === 'admin' || me.superAdmin === true;
+    if (!canManage) return;
+
+    const agents = await fetchJSON('/api/grwth-coach/team/training-eligibility-list');
+    const panel = document.getElementById('trainingLibraryPanel');
+    const list = document.getElementById('trainingEligibilityList');
+    if (!Array.isArray(agents) || agents.length === 0) return;
+
+    panel.style.display = 'block';
+    list.innerHTML = agents.map(a => `
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" data-agent-id="${a.id}" ${a.eligible ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-700);">${a.name}</span>
+      </label>
+    `).join('');
+
+    list.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+      checkbox.addEventListener('change', async () => {
+        const agentId = checkbox.dataset.agentId;
+        try {
+          await fetchJSON(`/api/grwth-coach/team/members/${agentId}/training-eligibility`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eligible: checkbox.checked }),
+          });
+        } catch (err) {
+          checkbox.checked = !checkbox.checked;
+          alert(`Couldn't update this setting: ${err.message}`);
+        }
+      });
+    });
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load training eligibility list:', err.message);
+  }
+})();
+  } catch (err) {
+    alert(`Couldn't disconnect: ${err.message}`);
+  }
+}
+
+// Outlook Calendar — same real pattern as Google Calendar, since the
+// connect/callback routes and the disconnect endpoint (generic across
+// all providers) follow the identical shape.
+function renderOutlookCalendarStatus(info) {
+  const statusEl = document.getElementById('status-outlook_calendar');
+  const btnEl = document.getElementById('btn-outlook_calendar');
+
+  if (info.status === 'connected') {
+    statusEl.className = 'integration-status connected';
+    statusEl.innerHTML = `<span class="status-dot connected"></span>Connected${info.connectedAs ? `<span class="integration-email">${info.connectedAs}</span>` : ''}`;
+    btnEl.textContent = 'Disconnect';
+    btnEl.className = 'btn-connect danger';
+    btnEl.onclick = disconnectOutlookCalendar;
+  } else {
+    statusEl.className = 'integration-status disconnected';
+    statusEl.innerHTML = `<span class="status-dot disconnected"></span>Not Connected`;
+    btnEl.textContent = 'Connect';
+    btnEl.className = 'btn-connect primary';
+    btnEl.onclick = connectOutlookCalendar;
+  }
+}
+
+function connectOutlookCalendar() {
+  if (!ADVISOR_ID) {
+    alert('No agent ID configured for this browser — set it via the Dashboard\'s dev config panel first.');
+    return;
+  }
+  window.location.href = `${API_BASE}/api/grwth-coach/integrations/outlook-calendar/connect?advisorId=${encodeURIComponent(ADVISOR_ID)}`;
+}
+
+async function disconnectOutlookCalendar() {
+  try {
+    await fetchJSON('/api/grwth-coach/integrations/outlook_calendar/disconnect', { method: 'POST' });
+    loadIntegrationStatus();
+  } catch (err) {
+    alert(`Couldn't disconnect: ${err.message}`);
+  }
+}
+
+// Zoom — same pattern as Google Calendar, since Zoom's OAuth connect/
+// callback routes follow the identical shape (redirect out, redirect back).
+function renderZoomStatus(info) {
+  const statusEl = document.getElementById('status-zoom');
+  const btnEl = document.getElementById('btn-zoom');
+
+  if (info.status === 'connected') {
+    statusEl.className = 'integration-status connected';
+    statusEl.innerHTML = `<span class="status-dot connected"></span>Connected${info.connectedAs ? `<span class="integration-email">${info.connectedAs}</span>` : ''}`;
+    btnEl.textContent = 'Disconnect';
+    btnEl.className = 'btn-connect danger';
+    btnEl.onclick = disconnectZoom;
+  } else {
+    statusEl.className = 'integration-status disconnected';
+    statusEl.innerHTML = `<span class="status-dot disconnected"></span>Not Connected`;
+    btnEl.textContent = 'Connect';
+    btnEl.className = 'btn-connect primary';
+    btnEl.onclick = connectZoom;
+  }
+}
+
+function connectZoom() {
+  if (!ADVISOR_ID) {
+    alert('No agent ID configured for this browser — set it via the Dashboard\'s dev config panel first.');
+    return;
+  }
+  window.location.href = `${API_BASE}/api/grwth-coach/integrations/zoom/connect?advisorId=${encodeURIComponent(ADVISOR_ID)}`;
+}
+
+async function disconnectZoom() {
+  try {
+    await fetchJSON('/api/grwth-coach/integrations/zoom/disconnect', { method: 'POST' });
+    loadIntegrationStatus();
+  } catch (err) {
+    alert(`Couldn't disconnect: ${err.message}`);
+  }
+}
+
+async function loadIntegrationStatus() {
+  if (!ADVISOR_ID) return; // leaves the static "Connect" buttons as-is
+  try {
+    const data = await fetchJSON('/api/grwth-coach/integrations');
+    // Real fix — each provider's status render is isolated in its own
+    // try/catch. One integration having bad/unexpected data (e.g. a
+    // status value the UI wasn't written to expect) must never stop
+    // the others from rendering and having their Connect buttons wired
+    // up — that was the real cause of Zoom's button doing nothing.
+    try { renderGoogleCalendarStatus(data.google_calendar); } catch (e) { console.warn('[GRWTH Coach] Google Calendar status render failed:', e.message); }
+    try { renderOutlookCalendarStatus(data.outlook_calendar); } catch (e) { console.warn('[GRWTH Coach] Outlook Calendar status render failed:', e.message); }
+    try { renderZoomStatus(data.zoom); } catch (e) { console.warn('[GRWTH Coach] Zoom status render failed:', e.message); }
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load integration status:', err.message);
+  }
+}
+
+// Real fix — a confirmed, exploitable reflected XSS: both the
+// "integration" and "reason" values here come straight from the URL
+// query string. If "integration" wasn't one of the three known keys,
+// its raw, attacker-controlled value was used as-is; "reason" was
+// never checked at all. Both were then written straight into
+// innerHTML with zero escaping — a URL like
+// a crafted URL with a malicious payload in either parameter would
+// execute arbitrary script in the visitor's own session. Every value
+// that can trace back to the URL now goes through escapeHtml() before
+// ever touching innerHTML, no matter which code path it takes.
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+/* Show a banner if we just landed here from the OAuth callback redirect */
+function showCallbackBanner() {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status');
+  const integration = params.get('integration');
+  if (!status || !integration) return;
+
+  const providerNames = { google_calendar: 'Google Calendar', outlook_calendar: 'Outlook Calendar', zoom: 'Zoom' };
+  const displayName = escapeHtml(providerNames[integration] || integration);
+
+  const banner = document.getElementById('integrationBanner');
+  banner.style.display = 'block';
+  if (status === 'success') {
+    banner.innerHTML = `<div class="info-banner" style="background:#E3F5F2;color:#0B7A70;">${displayName} connected successfully.</div>`;
+  } else {
+    const reason = escapeHtml(params.get('reason') || 'unknown error');
+    banner.innerHTML = `<div class="info-banner" style="background:#FBE6E3;color:#D5493A;">Couldn't connect ${displayName}: ${reason}</div>`;
+  }
+  window.history.replaceState({}, '', window.location.pathname);
+}
+
+showCallbackBanner();
+loadIntegrationStatus();
+
+// Real fix — these four toggles were previously pure static HTML with
+// no id, no handler, and nothing that ever read or saved their state.
+// Now genuinely loads the real saved value on page load and saves
+// immediately on change via PATCH /me.
+async function loadRecordingPreferences() {
+  if (!ADVISOR_ID) return;
+  try {
+    const me = await fetchJSON('/api/grwth-coach/me');
+    const prefs = me.recordingPreferences;
+    if (!prefs) return;
+    document.getElementById('prefRecordAll').checked = !!prefs.recordAllMeetings;
+    document.getElementById('prefEmailRecording').checked = !!prefs.emailRecordingToAttendees;
+    document.getElementById('prefAutoScore').checked = !!prefs.autoScoreCall;
+    document.getElementById('prefAutoFlagLibrary').checked = !!prefs.autoFlagForTrainingLibrary;
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load recording preferences:', err.message);
+  }
+}
+
+function wireRecordingPreferenceToggle(elementId, fieldName) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.addEventListener('change', async () => {
+    try {
+      await fetchJSON('/api/grwth-coach/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [fieldName]: el.checked }),
+      });
+    } catch (err) {
+      console.warn(`[GRWTH Coach] Failed to save ${fieldName}:`, err.message);
+      el.checked = !el.checked; // revert on failure so the UI never lies about what's actually saved
+    }
+  });
+}
+
+wireRecordingPreferenceToggle('prefRecordAll', 'recordAllMeetings');
+wireRecordingPreferenceToggle('prefEmailRecording', 'emailRecordingToAttendees');
+wireRecordingPreferenceToggle('prefAutoScore', 'autoScoreCall');
+wireRecordingPreferenceToggle('prefAutoFlagLibrary', 'autoFlagForTrainingLibrary');
+loadRecordingPreferences();
+
+/* ---------------------------------------------------------------------
+   Weekly homework auto-assign toggle -- owner/admin only, team-wide
+--------------------------------------------------------------------- */
+async function loadHomeworkAutoAssignSetting() {
+  const role = localStorage.getItem('grwth_advisor_role');
+  if (role !== 'agency_owner' && role !== 'admin') return;
+  const panel = document.getElementById('homeworkAutoAssignPanel');
+  if (panel) panel.style.display = 'block';
+  try {
+    const data = await fetchJSON('/api/grwth-coach/homework/settings');
+    const el = document.getElementById('prefHomeworkAutoAssign');
+    if (el) el.checked = !!data.homeworkAutoAssignEnabled;
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load homework auto-assign setting:', err.message);
+  }
+}
+
+const homeworkToggleEl = document.getElementById('prefHomeworkAutoAssign');
+if (homeworkToggleEl) {
+  homeworkToggleEl.addEventListener('change', async () => {
+    try {
+      await fetchJSON('/api/grwth-coach/homework/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: homeworkToggleEl.checked }),
+      });
+    } catch (err) {
+      console.warn('[GRWTH Coach] Failed to save homework auto-assign setting:', err.message);
+      homeworkToggleEl.checked = !homeworkToggleEl.checked;
+    }
+  });
+}
+loadHomeworkAutoAssignSetting();
+
+/* ---------------------------------------------------------------------
+   Meeting Types — real CRUD, replaces the static 2-item mockup.
+--------------------------------------------------------------------- */
+let editingTypeId = null;
+
+async function loadMeetingTypes() {
+  if (!ADVISOR_ID) return;
+  try {
+    const types = await fetchJSON('/api/grwth-coach/meeting-types');
+    document.getElementById('meetingTypesHeading').textContent = `Meeting Types (${types.length})`;
+    const list = document.getElementById('meetingTypesList');
+    list.innerHTML = types.map(t => `
+      <div class="type-row" data-id="${t.id}">
+        <span class="type-dot" style="background:${t.colorHex};"></span>
+        <span class="type-name">${t.name}${!t.autoRecord ? ' <span style="font-size:10.5px;color:var(--ink-400);font-weight:400;">(not auto-recorded)</span>' : ''}</span>
+        <button class="type-edit" data-action="edit">Edit</button>
+        <button class="type-edit" data-action="delete" style="color:var(--rose-600);">Delete</button>
+      </div>
+    `).join('') || '<p style="font-size:12.5px;color:var(--ink-400);">No meeting types yet — add one below.</p>';
+
+    list.querySelectorAll('[data-action="edit"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.type-row');
+        const type = types.find(t => t.id === row.dataset.id);
+        openTypeModal(type);
+      });
+    });
+    list.querySelectorAll('[data-action="delete"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('.type-row');
+        if (!confirm('Delete this meeting type? Meetings already using it keep their current auto-recording setting.')) return;
+        try {
+          await fetchJSON(`/api/grwth-coach/meeting-types/${row.dataset.id}`, { method: 'DELETE' });
+          loadMeetingTypes();
+        } catch (err) {
+          alert(`Couldn't delete: ${err.message}`);
+        }
+      });
+    });
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load meeting types:', err.message);
+  }
+}
+
+function openTypeModal(type) {
+  editingTypeId = type ? type.id : null;
+  document.getElementById('typeModalHeading').textContent = type ? 'Edit Meeting Type' : 'Add Meeting Type';
+  document.getElementById('typeNameInput').value = type ? type.name : '';
+  document.getElementById('typeColorInput').value = type ? type.colorHex : '#0D9488';
+  document.getElementById('typeAutoRecordInput').checked = type ? type.autoRecord : true;
+  document.getElementById('typeModalError').style.display = 'none';
+  document.getElementById('typeModalOverlay').style.display = 'flex';
+}
+
+document.getElementById('addTypeBtn').addEventListener('click', () => openTypeModal(null));
+document.getElementById('cancelTypeModal').addEventListener('click', () => {
+  document.getElementById('typeModalOverlay').style.display = 'none';
+});
+document.getElementById('saveTypeModal').addEventListener('click', async () => {
+  const name = document.getElementById('typeNameInput').value.trim();
+  const colorHex = document.getElementById('typeColorInput').value;
+  const autoRecord = document.getElementById('typeAutoRecordInput').checked;
+  const errorEl = document.getElementById('typeModalError');
+
+  if (!name) {
+    errorEl.textContent = 'Name is required.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    if (editingTypeId) {
+      await fetchJSON(`/api/grwth-coach/meeting-types/${editingTypeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, colorHex, autoRecord }),
+      });
+    } else {
+      await fetchJSON('/api/grwth-coach/meeting-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, colorHex, autoRecord }),
+      });
+    }
+    document.getElementById('typeModalOverlay').style.display = 'none';
+    loadMeetingTypes();
+  } catch (err) {
+    errorEl.textContent = `Couldn't save: ${err.message}`;
+    errorEl.style.display = 'block';
+  }
+});
+
+loadMeetingTypes();
+
+/* ---------------------------------------------------------------------
+   Personal Information — real data, real save. Was previously hardcoded
+   to one person regardless of who was logged in.
+--------------------------------------------------------------------- */
+async function loadProfile() {
+  if (!ADVISOR_ID) return;
+  try {
+    const me = await fetchJSON('/api/grwth-coach/me');
+    document.getElementById('accountNameDisplay').textContent = me.name;
+    document.getElementById('accountEmailDisplay').textContent = me.email;
+    document.getElementById('accountNameInput').value = me.name;
+    document.getElementById('accountEmailInput').value = me.email;
+    document.getElementById('botNameInput').value = me.botDisplayName || 'GRWTH Coach';
+    if (me.superAdmin) {
+      document.getElementById('superAdminNavGroup').style.display = 'block';
+    }
+    if (me.role === 'agency_owner') {
+      document.getElementById('orgNameFieldGroup').style.display = '';
+      document.getElementById('orgNameInput').value = me.teamName || '';
+      document.getElementById('hideProfileFieldGroup').style.display = '';
+      document.getElementById('hideProfileToggle').checked = !!me.hiddenFromTeamView;
+    }
+    const initials = me.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    document.getElementById('accountAvatarInitials').textContent = initials;
+    if (me.photoUrl) {
+      document.getElementById('accountAvatar').style.backgroundImage = `url(${me.photoUrl})`;
+      document.getElementById('accountAvatarInitials').style.display = 'none';
+      localStorage.setItem('grwth_advisor_photo', me.photoUrl);
+    }
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load profile:', err.message);
+  }
+}
+
+document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+  const name = document.getElementById('accountNameInput').value.trim();
+  const botDisplayName = document.getElementById('botNameInput').value.trim() || 'GRWTH Coach';
+  const orgFieldVisible = document.getElementById('orgNameFieldGroup').style.display !== 'none';
+  const teamName = orgFieldVisible ? document.getElementById('orgNameInput').value.trim() : undefined;
+  const hiddenFromTeamView = orgFieldVisible ? document.getElementById('hideProfileToggle').checked : undefined;
+  const note = document.getElementById('saveProfileNote');
+  if (!name) return;
+  try {
+    const payload = { name, botDisplayName };
+    if (teamName) payload.teamName = teamName;
+    if (hiddenFromTeamView !== undefined) payload.hiddenFromTeamView = hiddenFromTeamView;
+    await fetchJSON('/api/grwth-coach/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    localStorage.setItem('grwth_advisor_name', name);
+    document.getElementById('accountNameDisplay').textContent = name;
+    const nameEl = document.getElementById('sidebarFooterName');
+    if (nameEl) nameEl.textContent = name;
+    const orgNameEl = document.getElementById('sidebarOrgName');
+    if (orgNameEl && teamName) orgNameEl.textContent = teamName;
+    note.style.display = 'inline';
+    setTimeout(() => { note.style.display = 'none'; }, 1800);
+  } catch (err) {
+    alert(`Couldn't save: ${err.message}`);
+  }
+});
+
+document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+  const confirmed1 = confirm('Delete your account permanently? This removes every recording, transcript, score, and calendar connection you have. This cannot be undone.');
+  if (!confirmed1) return;
+  const typed = prompt('Type DELETE to confirm — this is permanent.');
+  if (typed !== 'DELETE') return;
+
+  try {
+    await fetchJSON('/api/grwth-coach/me', { method: 'DELETE' });
+    localStorage.removeItem('grwth_advisor_id');
+    localStorage.removeItem('grwth_advisor_name');
+    localStorage.removeItem('grwth_advisor_email');
+    localStorage.removeItem('grwth_advisor_role');
+    alert('Your account has been deleted.');
+    window.location.href = 'signup.html';
+  } catch (err) {
+    alert(`Couldn't delete your account: ${err.message}`);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   Team invitations — only shown to agency owners.
+--------------------------------------------------------------------- */
+async function loadInvitations() {
+  const role = localStorage.getItem('grwth_advisor_role');
+  if (role !== 'agency_owner') return;
+  document.getElementById('teamPanel').style.display = 'block';
+
+  try {
+    const me = await fetchJSON('/api/grwth-coach/me');
+    if (me.teamSlug) {
+      const frontendBase = window.location.origin;
+      document.getElementById('teamJoinLinkInput').value = `${frontendBase}/signup.html?joinTeam=${me.teamSlug}`;
+    }
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load team join link:', err.message);
+  }
+
+  try {
+    const invitations = await fetchJSON('/api/grwth-coach/invitations');
+    const list = document.getElementById('invitationsList');
+    if (invitations.length === 0) {
+      list.innerHTML = '<p style="font-size:12.5px;color:var(--ink-400);">No invitations sent yet.</p>';
+      return;
+    }
+    const statusColor = { pending: 'var(--amber-600, #C08A2E)', accepted: 'var(--teal-700)', revoked: 'var(--ink-400)', expired: 'var(--rose-600)' };
+    list.innerHTML = invitations.map(inv => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+        <div>
+          <div style="font-size:13px;font-weight:600;">${inv.email}</div>
+          <div style="font-size:11px;color:${statusColor[inv.status] || 'var(--ink-400)'};text-transform:capitalize;font-weight:700;">${inv.status} · ${inv.role === 'agency_owner' ? 'Owner' : 'Agent'}</div>
+        </div>
+        ${inv.status === 'pending' ? `<button class="type-edit" data-revoke="${inv.id}" style="color:var(--rose-600);">Revoke</button>` : ''}
+      </div>
+    `).join('');
+
+    list.querySelectorAll('[data-revoke]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await fetchJSON(`/api/grwth-coach/invitations/${btn.dataset.revoke}`, { method: 'DELETE' });
+          loadInvitations();
+        } catch (err) {
+          alert(`Couldn't revoke: ${err.message}`);
+        }
+      });
+    });
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load invitations:', err.message);
+  }
+}
+
+document.getElementById('sendInviteBtn').addEventListener('click', async () => {
+  const email = document.getElementById('inviteEmailInput').value.trim();
+  const role = document.getElementById('inviteRoleInput').value;
+  const errorEl = document.getElementById('inviteError');
+  errorEl.style.display = 'none';
+  if (!email) return;
+
+  try {
+    const result = await fetchJSON('/api/grwth-coach/invitations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, role }),
+    });
+    document.getElementById('inviteLinkOutput').value = result.inviteLink;
+    document.getElementById('inviteLinkBox').style.display = 'block';
+    document.getElementById('inviteEmailInput').value = '';
+    loadInvitations();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  }
+});
+
+document.getElementById('copyInviteLinkBtn').addEventListener('click', async () => {
+  const input = document.getElementById('inviteLinkOutput');
+  input.select();
+  try {
+    await navigator.clipboard.writeText(input.value);
+    const btn = document.getElementById('copyInviteLinkBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (err) {
+    console.error('Clipboard write failed', err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   Share management — owner/admin only, lists and revokes both internal
+   and external shares.
+--------------------------------------------------------------------- */
+async function loadShareManagement() {
+  const role = localStorage.getItem('grwth_advisor_role');
+  if (role !== 'agency_owner' && role !== 'admin') return;
+  document.getElementById('sharingTabBtn').style.display = 'inline-block';
+
+  try {
+    const data = await fetchJSON('/api/grwth-coach/shares');
+    renderInternalShares(data.internal);
+    renderExternalShares(data.external);
+  } catch (err) {
+    document.getElementById('internalSharesList').textContent = "Couldn't load shares.";
+    document.getElementById('externalSharesList').textContent = "Couldn't load shares.";
+  }
+}
+
+function renderInternalShares(shares) {
+  const host = document.getElementById('internalSharesList');
+  if (shares.length === 0) {
+    host.innerHTML = '<p style="font-size:12.5px;color:var(--ink-400);">No calls shared with teammates yet.</p>';
+    return;
+  }
+  host.innerHTML = shares.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${s.clientName}</div>
+        <div style="font-size:11.5px;color:var(--ink-400);">Shared by ${s.sharedByName} with ${s.sharedWithName}${s.note ? ' — "' + s.note + '"' : ''}</div>
+      </div>
+      <button data-revoke-internal="${s.id}" style="background:var(--white);border:1px solid var(--rose-600);color:var(--rose-600);padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;">Revoke</button>
+    </div>
+  `).join('');
+
+  host.querySelectorAll('[data-revoke-internal]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm("Revoke this share? They'll immediately lose access.")) return;
+      try {
+        await fetchJSON(`/api/grwth-coach/shares/internal/${btn.dataset.revokeInternal}`, { method: 'DELETE' });
+        loadShareManagement();
+      } catch (err) {
+        alert(`Couldn't revoke: ${err.message}`);
+      }
+    });
+  });
+}
+
+function renderExternalShares(shares) {
+  const host = document.getElementById('externalSharesList');
+  if (shares.length === 0) {
+    host.innerHTML = '<p style="font-size:12.5px;color:var(--ink-400);">No external links created yet.</p>';
+    return;
+  }
+  host.innerHTML = shares.map(s => {
+    const sections = Object.entries(s.sections).filter(([, v]) => v).map(([k]) => k).join(', ');
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${s.clientName}</div>
+        <div style="font-size:11.5px;color:var(--ink-400);">${s.accessMode === 'anyone' ? 'Anyone with the link' : 'Restricted to: ' + s.allowedEmails.join(', ')} — includes: ${sections || 'nothing'}</div>
+      </div>
+      <button data-revoke-external="${s.id}" style="background:var(--white);border:1px solid var(--rose-600);color:var(--rose-600);padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;">Revoke</button>
+    </div>
+  `;
+  }).join('');
+
+  host.querySelectorAll('[data-revoke-external]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Revoke this link? It will stop working immediately for anyone who has it.')) return;
+      try {
+        await fetchJSON(`/api/grwth-coach/shares/external/${btn.dataset.revokeExternal}`, { method: 'DELETE' });
+        loadShareManagement();
+      } catch (err) {
+        alert(`Couldn't revoke: ${err.message}`);
+      }
+    });
+  });
+}
+
+/* ---------------------------------------------------------------------
+   Billing — real checkout buttons, redirect to actual Stripe Checkout.
+--------------------------------------------------------------------- */
+document.querySelectorAll('[data-checkout-plan]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const plan = btn.dataset.checkoutPlan;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Redirecting…';
+    try {
+      const result = await fetchJSON('/api/grwth-coach/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+      } else {
+        throw new Error(result.error || 'No checkout URL returned');
+      }
+    } catch (err) {
+      document.getElementById('billingStatusMsg').textContent = `Couldn't start checkout: ${err.message}`;
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+});
+
+async function loadBillingStatus() {
+  if (localStorage.getItem('grwth_advisor_role') === 'agency_owner') {
+    document.getElementById('agencyBillingPanel').style.display = 'block';
+  }
+  try {
+    const status = await fetchJSON('/api/grwth-coach/billing/status');
+
+    if (status.coach) {
+      const card = document.getElementById('coachStatusCard');
+      const label = status.coach.status === 'past_due' ? 'Payment Failed' : status.coach.status === 'trialing' ? 'Trial' : 'Active';
+      const endDate = status.coach.currentPeriodEnd ? new Date(status.coach.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+      card.innerHTML = `
+        <div style="border:1px solid var(--teal-500);border-radius:12px;padding:18px;background:var(--teal-100);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--teal-700);">${label}</span>
+          </div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:20px;margin-bottom:6px;">GRWTH Coach — ${status.coach.interval === 'annual' ? 'Annual' : 'Monthly'}</div>
+          <div style="font-size:12px;color:var(--ink-500);">${status.coach.cancelAtPeriodEnd ? 'Cancels' : 'Renews'} ${endDate}</div>
+        </div>
+      `;
+    }
+
+    if (status.roleplayAddon) {
+      const banner = document.getElementById('roleplayAddonStatus');
+      banner.style.display = 'block';
+      banner.textContent = `Role-Play Add-On active — ${status.roleplayCredits} credit${status.roleplayCredits === 1 ? '' : 's'} remaining.`;
+    } else if (status.roleplayCredits > 0) {
+      const banner = document.getElementById('roleplayAddonStatus');
+      banner.style.display = 'block';
+      banner.textContent = `${status.roleplayCredits} Role-Play credit${status.roleplayCredits === 1 ? '' : 's'} remaining.`;
+    }
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load billing status:', err.message);
+  }
+}
+
+const checkoutParam = new URLSearchParams(window.location.search).get('checkout');
+if (checkoutParam === 'success' || checkoutParam === 'canceled') {
+  // Real fix — the redirect landed on the right page, but nothing told
+  // it to actually show the Billing tab, so it silently showed
+  // whatever tab was default (Integrations).
+  document.querySelector('.settings-tab[data-panel="subscription"]').click();
+}
+if (checkoutParam === 'success') {
+  document.getElementById('billingStatusMsg').textContent = 'Subscription active — thank you!';
+} else if (checkoutParam === 'canceled') {
+  document.getElementById('billingStatusMsg').textContent = 'Checkout canceled — no charge was made.';
+}
+
+loadBillingStatus();
+document.getElementById('copyTeamJoinLinkBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('copyTeamJoinLinkBtn');
+  const input = document.getElementById('teamJoinLinkInput');
+  if (!input.value) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (err) {
+    console.error('Clipboard write failed', err);
+  }
+});
+
+loadProfile();
+loadInvitations();
+loadShareManagement();
+</script>
+
+
+<script>
+(function() {
+  var apiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+  var advisorId = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+  if (!advisorId) return;
+  fetch(apiBase + '/api/grwth-coach/roleplay/personalized-scenarios', { credentials: 'include', headers: { 'x-advisor-id': advisorId } })
+    .then(function(r) { return r.json(); })
+    .then(function(scenarios) {
+      if (Array.isArray(scenarios) && scenarios.length > 0) {
+        var dot = document.getElementById('roleplayReadyDot');
+        if (dot) dot.style.display = 'block';
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+
+<script>
+(function() {
+  // Real fix — the @vercel/blob client-upload flow has a confirmed,
+  // external Vercel platform bug on the Hobby plan (browser PUT to
+  // vercel.com/api/blob never returns CORS headers). Uploading via a
+  // plain fetch straight to our own backend, which then proxies to
+  // Blob storage server-side, sidesteps that bug entirely.
+  var photoInput = document.getElementById('photoUploadInput');
+  var statusEl = document.getElementById('photoUploadStatus');
+  var apiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+  var cropOverlay = document.getElementById('cropModalOverlay');
+  var cropImage = document.getElementById('cropImage');
+  var cropper = null;
+
+  if (photoInput) {
+    photoInput.addEventListener('change', function() {
+      var file = photoInput.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        cropImage.src = e.target.result;
+        cropOverlay.style.display = 'flex';
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(cropImage, {
+          aspectRatio: 1,
+          viewMode: 1,
+          background: false,
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById('cropCancelBtn').addEventListener('click', function() {
+    cropOverlay.style.display = 'none';
+    if (cropper) { cropper.destroy(); cropper = null; }
+    photoInput.value = '';
+  });
+
+  document.getElementById('cropSaveBtn').addEventListener('click', function() {
+    if (!cropper) return;
+    cropOverlay.style.display = 'none';
+    var canvas = cropper.getCroppedCanvas({ width: 400, height: 400 });
+    cropper.destroy();
+    cropper = null;
+    canvas.toBlob(function(blob) {
+      statusEl.textContent = 'Uploading...';
+      var formData = new FormData();
+      formData.append('file', blob, 'photo.jpg');
+      fetch(`${apiBase}/api/grwth-coach/uploads/photo`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+        .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, status: res.status, data: data }; }); })
+        .then(function(result) {
+          if (!result.ok) throw new Error('Status ' + result.status + ': ' + (result.data.error || 'Upload failed'));
+          document.getElementById('accountAvatar').style.backgroundImage = `url(${result.data.url})`;
+          document.getElementById('accountAvatarInitials').style.display = 'none';
+          localStorage.setItem('grwth_advisor_photo', result.data.url);
+          // Real fix — the sidebar avatar (bottom-left) is a separate
+          // element from the account panel photo above, and its own
+          // identity script only runs once on page load. Update it here
+          // too so it reflects the new photo immediately, not just after
+          // a full page refresh.
+          var sidebarAvatarEl = document.getElementById('sidebarAvatar');
+          if (sidebarAvatarEl) {
+            sidebarAvatarEl.style.backgroundImage = `url(${result.data.url})`;
+            sidebarAvatarEl.style.backgroundSize = 'cover';
+            sidebarAvatarEl.style.backgroundPosition = 'center';
+            sidebarAvatarEl.textContent = '';
+          }
+          statusEl.textContent = 'Photo updated';
+          setTimeout(function() { statusEl.textContent = 'Click your photo to upload a new one'; }, 3000);
+        })
+        .catch(function(err) {
+          statusEl.textContent = 'FAILED: ' + err.message;
+          statusEl.style.color = '#D5493A';
+        })
+        .finally(function() { photoInput.value = ''; });
+    }, 'image/jpeg', 0.9);
+  });
+})();
+</script>
+</body>
+</html>

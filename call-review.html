@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Call Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!--
+  =========================================================================
+  GRWTH COACH — CALL REVIEW
+  This is the flagship screen — where advisors actually spend their time.
+  Synced transcript + moment timeline + Natural Selling Grading™ breakdown,
+  built to compete directly with 7Q's call review experience.
+
+  WIRING NOTES FOR MANUS INTEGRATION:
+  - Replace MOCK_CALL below with a live call to your call-detail endpoint.
+    Look for `// MANUS:FETCH` markers.
+  - The scrubber's moment markers (renderTimeline) are positioned by
+    percentage of total duration — feed real timestamps in seconds.
+  - Player itself is a visual simulation (no real audio/video wired yet) —
+    swap `playheadPct` logic for your actual media element's timeupdate.
+  - "Copy" buttons on the Follow-Ups tab use the Clipboard API directly.
+  =========================================================================
+-->
+
+<style>
+  :root {
+    --teal-700: #0B7A70;
+    --teal-600: #0D9488;
+    --teal-500: #14B8A6;
+    --teal-400: #2DD4BF;
+    --teal-glow: rgba(13,148,136,0.45);
+    --teal-muted: rgba(13,148,136,0.12);
+
+    --slate-950: #0E1018;
+    --slate-900: #1A1A2E;
+    --slate-800: #252A3D;
+    --slate-700: #363C54;
+
+    --bg: #F4F6F8;
+    --white: #FFFFFF;
+    --ink-900: #12141F;
+    --ink-700: #2E3244;
+    --ink-500: #6B7280;
+    --ink-400: #9098A8;
+    --ink-300: #D1D5DB;
+    --line: #E4E7EC;
+
+    --amber-600: #C08A2E;
+    --amber-100: #FBF1DD;
+    --rose-600: #D5493A;
+    --rose-100: #FBE6E3;
+    --teal-100: #E3F5F2;
+
+    --font-display: 'Geist', -apple-system, sans-serif;
+    --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow-card: 0 1px 2px rgba(14,16,24,0.04), 0 12px 28px -14px rgba(14,16,24,0.14);
+  }
+
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink-900); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
+
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--teal-600); outline-offset: 2px;
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 22px 32px 70px; }
+
+  /* ---------------- Top bar ---------------- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+
+  .topbar-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+
+  .back-btn {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--white);
+    border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background 0.15s ease;
+  }
+  .back-btn:hover { background: var(--teal-muted); }
+  .back-btn svg { width: 16px; height: 16px; color: var(--ink-700); }
+
+  .breadcrumb { font-size: 11.5px; color: var(--ink-400); font-weight: 600; margin-bottom: 3px; }
+  .breadcrumb span { color: var(--teal-600); }
+
+  .call-title { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.4px; color: var(--ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .call-meta { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-500); margin-top: 3px; }
+
+  .platform-tag {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
+    color: var(--teal-700); background: var(--teal-100); border: 1px solid rgba(13,148,136,0.18);
+    padding: 3px 9px; border-radius: 999px;
+  }
+
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--white);
+    border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .icon-btn:hover { background: var(--teal-muted); border-color: var(--teal-500); }
+  .icon-btn svg { width: 16px; height: 16px; color: var(--ink-700); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--teal-500), var(--teal-700));
+    color: #FFFFFF; border: none; padding: 11px 20px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 7px;
+    white-space: nowrap; box-shadow: 0 8px 20px -8px rgba(13,148,136,0.65);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(13,148,136,0.75); }
+  .btn-primary svg { width: 14px; height: 14px; }
+
+  /* ---------------- Tabs ---------------- */
+  .tabs { display: flex; gap: 4px; background: var(--white); border: 1px solid var(--line); border-radius: 999px; padding: 4px; width: fit-content; margin-bottom: 20px; }
+  .tab-btn { border: none; background: transparent; padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--ink-400); transition: all 0.15s ease; }
+  .tab-btn.active { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #FFFFFF; }
+
+  /* ---------------- Grid ---------------- */
+  .review-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+
+  .panel { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+
+  /* ---------------- Player / scrubber ---------------- */
+  .player {
+    background: linear-gradient(150deg, var(--slate-900), var(--slate-950));
+    border-radius: var(--radius); padding: 20px 22px 16px; margin-bottom: 18px;
+    box-shadow: 0 16px 36px -18px rgba(14,16,24,0.5);
+  }
+
+  .player-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+
+  .play-btn {
+    width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--teal-400), var(--teal-600));
+    border: none; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    box-shadow: 0 6px 16px -4px rgba(45,212,191,0.6);
+  }
+  .play-btn svg { width: 15px; height: 15px; color: #06110F; }
+
+  .player-time { font-family: var(--font-mono); font-size: 12.5px; color: #B8C2C6; white-space: nowrap; }
+  .player-time strong { color: #FFFFFF; }
+
+  .speed-btn { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: #B8C2C6; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 999px; }
+
+  .timeline-wrap { position: relative; padding-top: 18px; }
+
+  .timeline-track { position: relative; height: 6px; border-radius: 999px; background: rgba(255,255,255,0.12); overflow: visible; }
+  .timeline-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--teal-400), var(--teal-600)); }
+  .timeline-playhead { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 0 3px rgba(45,212,191,0.4); transform: translate(-50%, -50%); }
+
+  .moment-marker {
+    position: absolute; top: -13px; width: 9px; height: 9px; border-radius: 50%;
+    transform: translateX(-50%); border: 2px solid var(--slate-950); cursor: pointer;
+  }
+  .moment-marker.buying { background: var(--teal-400); }
+  .moment-marker.objection { background: var(--rose-600); }
+  .moment-marker.question { background: var(--amber-600); }
+
+  .legend { display: flex; gap: 16px; margin-top: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #B8C2C6; font-weight: 500; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-dot.buying { background: var(--teal-400); }
+  .legend-dot.objection { background: var(--rose-600); }
+  .legend-dot.question { background: var(--amber-600); }
+
+  /* ---------------- Overview tab content ---------------- */
+  .summary-card { padding: 22px 24px; margin-bottom: 16px; }
+  .summary-card h3 { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin: 0 0 10px; color: var(--ink-900); }
+  .summary-card p { font-size: 13.5px; line-height: 1.65; color: var(--ink-700); margin: 0; }
+
+  .metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .metric-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px; box-shadow: var(--shadow-card); }
+  .metric-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 6px; }
+  .metric-value { font-family: var(--font-display); font-weight: 700; font-size: 21px; color: var(--ink-900); }
+  .metric-sub { font-family: var(--font-mono); font-size: 11px; color: var(--teal-700); margin-top: 4px; }
+
+  .talk-ratio-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 10px; }
+  .talk-ratio-bar .agent { background: var(--teal-500); }
+  .talk-ratio-bar .client { background: var(--ink-300); }
+  .talk-ratio-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-500); margin-top: 6px; font-family: var(--font-mono); }
+
+  .moments-list { padding: 20px 22px; }
+  .moments-list h3 { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin: 0 0 14px; }
+  .moment-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .moment-row:last-child { border-bottom: none; }
+  .moment-row:hover .moment-text { color: var(--teal-700); }
+  .moment-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .moment-dot.buying { background: var(--teal-500); }
+  .moment-dot.objection { background: var(--rose-600); }
+  .moment-dot.question { background: var(--amber-600); }
+  .moment-time { font-family: var(--font-mono); font-size: 11px; color: var(--ink-400); flex-shrink: 0; width: 42px; }
+  .moment-text { font-size: 12.5px; color: var(--ink-700); line-height: 1.4; transition: color 0.15s ease; }
+
+  /* ---------------- Transcript tab ---------------- */
+  .transcript-search {
+    display: flex; align-items: center; gap: 8px; background: var(--white); border: 1px solid var(--line);
+    border-radius: 999px; padding: 9px 15px; margin-bottom: 16px;
+  }
+  .transcript-search svg { width: 14px; height: 14px; color: var(--ink-400); flex-shrink: 0; }
+  .transcript-search input { border: none; outline: none; font-size: 13px; font-family: inherit; width: 100%; background: transparent; }
+
+  .transcript-panel { padding: 6px 4px; max-height: 640px; overflow-y: auto; }
+  .t-row { display: grid; grid-template-columns: 46px 30px 1fr; gap: 12px; padding: 12px 20px; border-left: 3px solid transparent; align-items: start; }
+  .t-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 10px; color: #fff; margin-top: 1px; }
+  .t-row.tag-buying { border-left-color: var(--teal-500); background: linear-gradient(90deg, var(--teal-muted), transparent 40%); }
+  .t-row.tag-objection { border-left-color: var(--rose-600); background: linear-gradient(90deg, var(--rose-100), transparent 40%); }
+  .t-row.tag-question { border-left-color: var(--amber-600); background: linear-gradient(90deg, var(--amber-100), transparent 40%); }
+
+  .t-time { font-family: var(--font-mono); font-size: 11px; color: var(--ink-400); padding-top: 2px; }
+  .t-speaker { font-size: 12px; font-weight: 700; color: var(--ink-900); margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
+  .t-speaker .tag-pill { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 5px; }
+  .tag-pill.buying { background: var(--teal-100); color: var(--teal-700); }
+  .tag-pill.objection { background: var(--rose-100); color: var(--rose-600); }
+  .tag-pill.question { background: var(--amber-100); color: var(--amber-600); }
+  .t-text { font-size: 13px; line-height: 1.55; color: var(--ink-700); }
+
+  /* ---------------- Coaching tab ---------------- */
+  .coaching-section { padding: 20px 22px; margin-bottom: 16px; }
+  .coaching-section h3 { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .coaching-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.5; color: var(--ink-700); }
+  .coaching-item:last-child { border-bottom: none; }
+  .coaching-item svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; }
+  .coaching-item.strength svg { color: var(--teal-600); }
+  .coaching-item.opportunity svg { color: var(--amber-600); }
+  .coaching-item.missed svg { color: var(--rose-600); }
+
+  .practice-callout {
+    background: linear-gradient(150deg, var(--slate-900), var(--slate-950));
+    border-radius: 18px; padding: 26px 28px; color: #FFFFFF; position: relative; overflow: hidden;
+    box-shadow: 0 20px 44px -18px rgba(14,16,24,0.4);
+  }
+  .practice-callout::before { content: ''; position: absolute; top: -35%; right: -10%; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(45,212,191,0.16), transparent 70%); pointer-events: none; }
+  .practice-callout .eyebrow { position: relative; display: flex; align-items: center; gap: 7px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; color: var(--teal-400); margin-bottom: 10px; }
+  .practice-callout h4 { position: relative; font-family: var(--font-display); font-weight: 700; font-size: 18px; margin: 0 0 9px; letter-spacing: -0.2px; }
+  .practice-callout p { position: relative; font-size: 13.5px; line-height: 1.6; color: #C7D0D3; margin: 0 0 18px; }
+  .practice-callout-cta { position: relative; display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--teal-400), var(--teal-600)); color: #06110F; text-decoration: none; padding: 11px 20px; border-radius: 999px; font-weight: 700; font-size: 13px; box-shadow: 0 10px 22px -10px rgba(45,212,191,0.5); }
+
+  /* ---------------- Coaching: module tree + detail panel ---------------- */
+  .coaching-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; align-items: start; }
+
+  .module-tree { padding: 16px 12px; }
+  .module-tree-head { display: flex; align-items: center; gap: 8px; padding: 4px 10px 12px; }
+  .module-tree-head svg { width: 15px; height: 15px; color: var(--teal-600); }
+  .module-tree-head span { font-family: var(--font-display); font-weight: 700; font-size: 13.5px; color: var(--ink-900); }
+  .module-tree-count { font-size: 11px; color: var(--ink-400); padding: 0 10px 10px; }
+
+  .phase-group { margin-bottom: 2px; }
+  .phase-header {
+    display: flex; align-items: center; gap: 9px; width: 100%; border: none; background: transparent;
+    padding: 9px 10px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 700; color: var(--ink-700);
+    text-align: left; transition: background 0.12s ease;
+  }
+  .phase-header:hover { background: var(--teal-muted); }
+  .phase-badge { font-family: var(--font-mono); font-weight: 700; font-size: 10.5px; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .phase-badge.A { background: var(--teal-100); color: var(--teal-700); }
+  .phase-badge.B { background: var(--amber-100); color: var(--amber-600); }
+  .phase-badge.C, .phase-badge.D { background: var(--rose-100); color: var(--rose-600); }
+  .phase-chevron { margin-left: auto; width: 13px; height: 13px; color: var(--ink-400); transition: transform 0.15s ease; flex-shrink: 0; }
+  .phase-group.collapsed .phase-chevron { transform: rotate(-90deg); }
+  .phase-group.collapsed .sub-list { display: none; }
+
+  .sub-list { padding: 2px 0 6px 20px; }
+  .sub-item {
+    display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: transparent;
+    padding: 7px 9px; border-radius: 8px; font-size: 12px; color: var(--ink-500); text-align: left;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .sub-item:hover { background: var(--teal-muted); color: var(--ink-900); }
+  .sub-item.active { background: var(--teal-100); color: var(--teal-700); font-weight: 600; }
+  .sub-item .mini-badge { font-family: var(--font-mono); font-weight: 700; font-size: 9.5px; }
+  .sub-item .mini-badge.A { color: var(--teal-700); }
+  .sub-item .mini-badge.B { color: var(--amber-600); }
+  .sub-item .mini-badge.C, .sub-item .mini-badge.D { color: var(--rose-600); }
+
+  .mechanics-link {
+    display: flex; align-items: center; gap: 9px; width: 100%; border: none; background: transparent;
+    padding: 10px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 700; color: var(--ink-700);
+    text-align: left; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 14px;
+  }
+  .mechanics-link:hover { background: var(--teal-muted); }
+  .mechanics-link.active { background: var(--teal-100); color: var(--teal-700); }
+  .mechanics-link svg { width: 15px; height: 15px; color: var(--teal-600); flex-shrink: 0; }
+
+  /* Detail panel */
+  .detail-panel { padding: 24px 26px; }
+  .detail-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+  .detail-title { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--ink-900); letter-spacing: -0.3px; }
+  .detail-score-badge { font-family: var(--font-mono); font-weight: 700; font-size: 15px; padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
+  .detail-score-badge.A { background: var(--teal-100); color: var(--teal-700); }
+  .detail-score-badge.B { background: var(--amber-100); color: var(--amber-600); }
+  .detail-score-badge.C, .detail-score-badge.D { background: var(--rose-100); color: var(--rose-600); }
+
+  .detail-desc { font-size: 13px; color: var(--ink-500); line-height: 1.55; margin-bottom: 10px; }
+
+  .confidence-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--teal-700); margin-bottom: 18px; }
+  .confidence-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal-500); }
+
+  .detail-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .detail-metric-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-700); font-weight: 500; margin-bottom: 6px; }
+  .detail-metric-label strong { font-family: var(--font-mono); color: var(--teal-700); font-weight: 700; }
+  .detail-metric-track { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .detail-metric-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--teal-400), var(--teal-600)); }
+
+  .hit-missed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .hm-col-label { display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 10px; }
+  .hm-col-label svg { width: 13px; height: 13px; }
+  .hm-col-label.hit svg { color: var(--teal-600); }
+  .hm-col-label.miss svg { color: var(--rose-600); }
+  .hm-item { display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; color: var(--ink-700); line-height: 1.45; margin-bottom: 8px; }
+  .hm-item svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+  .hm-item.hit svg { color: var(--teal-600); }
+  .hm-item.miss svg { color: var(--rose-600); }
+  .hm-empty { font-size: 12px; color: var(--ink-400); font-style: italic; }
+
+  .focus-callout {
+    background: var(--teal-100); border: 1px solid rgba(13,148,136,0.22); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 18px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .focus-callout svg { width: 18px; height: 18px; color: var(--teal-700); flex-shrink: 0; margin-top: 1px; }
+  .focus-callout-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--teal-700); margin-bottom: 3px; }
+  .focus-callout-text { font-size: 13.5px; font-weight: 600; color: var(--ink-900); line-height: 1.4; }
+
+  .detail-analysis { font-size: 13px; line-height: 1.65; color: var(--ink-700); margin-bottom: 20px; }
+
+  .suggestions-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 10px; }
+  .suggestion-item { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .suggestion-num {
+    font-family: var(--font-mono); font-weight: 700; font-size: 11px; color: var(--teal-700); background: var(--teal-100);
+    width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+  }
+  .suggestion-text { font-size: 12.5px; line-height: 1.55; color: var(--ink-700); }
+  .suggestion-text em { color: var(--teal-700); font-style: italic; }
+
+  /* Call Mechanics detail view */
+  .mechanics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .mechanics-cell { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .mechanics-cell-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 6px; }
+  .mechanics-cell-value { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--ink-900); }
+
+  @media (max-width: 900px) {
+    .coaching-layout { grid-template-columns: 1fr; }
+    .detail-metrics, .hit-missed-grid { grid-template-columns: 1fr; }
+    .mechanics-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ---------------- Follow-ups tab ---------------- */
+  .followup-card { padding: 18px 20px; margin-bottom: 14px; }
+  .followup-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .followup-head h4 { font-family: var(--font-display); font-size: 14px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--teal-700);
+    background: var(--teal-100); border: 1px solid rgba(13,148,136,0.2); padding: 6px 12px; border-radius: 999px;
+    transition: background 0.15s ease;
+  }
+  .copy-btn:hover { background: var(--teal-500); color: #FFFFFF; }
+  .copy-btn svg { width: 12px; height: 12px; }
+  .followup-body { font-size: 13px; line-height: 1.6; color: var(--ink-700); white-space: pre-wrap; background: var(--bg); border-radius: var(--radius-sm); padding: 14px 16px; border: 1px solid var(--line); }
+
+  /* ---------------- Sidebar ---------------- */
+  .sidebar-panel { padding: 28px 24px; position: sticky; top: 22px; background: linear-gradient(155deg,var(--slate-900) 0%,#1A1B2E 65%,var(--slate-900) 100%); border: none; position: relative; overflow: hidden; box-shadow: 0 24px 50px -20px rgba(14,16,24,0.4); }
+  .sidebar-panel.recruiting { background: linear-gradient(155deg,#221A33 0%,#2B1F42 65%,#221A33 100%); }
+  .sidebar-panel.recruiting::before { background: radial-gradient(circle, rgba(124,92,191,0.22), transparent 70%) !important; }
+  .sidebar-panel.recruiting .ring-caption { color: #B8A0E8; }
+  .sidebar-panel::before { content: ''; position: absolute; top: -35%; right: -15%; width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle, rgba(45,212,191,0.16), transparent 70%); pointer-events: none; }
+
+  .ring-score-block { position: relative; display: flex; flex-direction: column; align-items: center; padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .ring-wrap { position: relative; width: 132px; height: 132px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-score { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 38px; color: #fff; letter-spacing: -0.6px; }
+  .ring-caption { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; color: var(--teal-400); margin-top: 12px; }
+
+  .grade-list { position: relative; }
+  .grade-list h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.3px; font-weight: 800; color: rgba(255,255,255,0.55); margin: 0 0 16px; text-align: center; }
+  .grade-row { margin-bottom: 13px; }
+  .grade-row-top { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; margin-bottom: 6px; }
+  .grade-row-top span:first-child { color: rgba(255,255,255,0.75); font-weight: 500; }
+  .grade-letter { font-family: var(--font-mono); font-weight: 700; font-size: 11.5px; }
+  .grade-letter.A { color: var(--teal-400); }
+  .grade-letter.B { color: #E8B84B; }
+  .grade-letter.C, .grade-letter.D { color: #F0897C; }
+  .grade-bar-track { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.12); overflow: hidden; }
+  .grade-bar-fill { height: 100%; border-radius: 999px; }
+  .grade-bar-fill.A { background: linear-gradient(90deg, var(--teal-400), var(--teal-600)); }
+  .grade-bar-fill.B { background: #E8B84B; }
+  .grade-bar-fill.C, .grade-bar-fill.D { background: #F0897C; }
+
+  /* ---------------- Responsive ---------------- */
+  @media (max-width: 980px) {
+    .review-grid { grid-template-columns: 1fr; }
+    .sidebar-panel { position: static; }
+    .metric-row { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .page { padding: 16px 16px 50px; }
+    .metric-row { grid-template-columns: 1fr 1fr; }
+    .topbar-right { width: 100%; justify-content: flex-end; }
+  }
+
+  [data-tabcontent] { display: none; }
+  [data-tabcontent].active { display: block; }
+</style>
+</head>
+<body>
+
+<div id="viewAsBanner" style="display:none;position:sticky;top:0;z-index:200;background:linear-gradient(90deg,#1A1B2E,#0E1018);color:#fff;padding:10px 24px;font-size:12.5px;font-weight:600;display:none;align-items:center;justify-content:center;gap:10px;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14" style="color:#2DD4BF;"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+  <span>Viewing as <strong id="viewAsName">—</strong> — this is exactly what they see.</span>
+  <button id="exitViewAsBtn" style="background:rgba(255,255,255,0.12);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;margin-left:6px;">Exit Preview</button>
+</div>
+
+<script>
+(function() {
+  // Real fix — the "view as" shim must run before ANY other script on
+  // the page reads the advisor ID, so it patches localStorage.getItem
+  // itself rather than requiring every page's fetch logic to be touched
+  // individually.
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  if (viewingAsId) {
+    var originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === 'grwth_advisor_id') return viewingAsId;
+      return originalGetItem.call(this, key);
+    };
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var apiBase = window.GRWTH_API_BASE || Storage.prototype.getItem.call(localStorage, 'grwth_api_base') || 'https://api.grwthtech.com';
+  var realAdvisorId = Storage.prototype.getItem.call(localStorage, 'grwth_advisor_id');
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  var viewingAsName = sessionStorage.getItem('grwth_viewing_as_name');
+
+  if (viewingAsId && viewingAsName) {
+    document.getElementById('viewAsName').textContent = viewingAsName;
+    document.getElementById('viewAsBanner').style.display = 'flex';
+  }
+
+  document.getElementById('exitViewAsBtn').addEventListener('click', function() {
+    sessionStorage.removeItem('grwth_viewing_as_id');
+    sessionStorage.removeItem('grwth_viewing_as_name');
+    window.location.reload();
+  });
+
+  // Real fix — the "View As" button itself now lives only on
+  // Settings, per Logan's requirement. The shim above and this banner
+  // still apply on every page so browsing the rest of the app while
+  // viewing as someone else keeps working correctly.
+});
+</script>
+
+
+
+<div class="page">
+
+  <!-- ============ TOP BAR ============ -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="back-btn" id="backBtn" aria-label="Back to Meetings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="breadcrumb">Meetings / <span id="breadcrumbName">Loading…</span></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input id="callTitleInput" class="call-title" value="" style="border:none;outline:none;background:transparent;padding:2px 4px;border-radius:6px;width:auto;min-width:200px;font:inherit;" />
+          <button id="saveCallTitleBtn" style="display:none;font-size:11px;font-weight:700;color:var(--teal-700);background:var(--teal-100);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;">Save</button>
+        </div>
+        <div class="call-meta">
+          <span class="platform-tag" id="callTitlePlatform">—</span>
+          <span id="callTitleTypeBadge" style="display:none;font-size:11px;font-weight:700;color:#7C5CBF;background:#EFE9FA;padding:3px 9px;border-radius:999px;margin-right:6px;">Recruiting Call</span>
+          <span id="callTitleMeta">—</span>
+          <select id="leadSourceSelect" style="font-size:11px;font-weight:700;color:var(--ink-500);background:var(--bg);border:1px solid var(--line);padding:3px 9px;border-radius:999px;cursor:pointer;">
+            <option value="">Tag lead source…</option>
+            <option value="Referral">Referral</option>
+            <option value="Facebook Ads">Facebook Ads</option>
+            <option value="Cold Call">Cold Call</option>
+            <option value="Web Lead">Web Lead</option>
+            <option value="Repeat Client">Repeat Client</option>
+            <option value="Event/Seminar">Event/Seminar</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" id="shareInternalBtn" aria-label="Share with Teammate" style="display:none;" title="Share with a teammate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </button>
+      <button class="icon-btn" id="shareBtn" aria-label="Share">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+      </button>
+<button class="icon-btn" id="deleteBtn" aria-label="Delete" style="color:var(--rose-600);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/></svg>
+      </button>
+      <button class="btn-primary" id="generateFollowupBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+        <span id="generateFollowupBtnText">Generate Follow-Up</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SHARE MODAL -->
+  <div class="modal-overlay" id="shareModalOverlay" style="position:fixed;inset:0;background:rgba(14,16,24,0.5);display:none;align-items:center;justify-content:center;z-index:60;">
+    <div style="background:var(--white);border-radius:var(--radius);padding:24px 26px;width:420px;max-width:90vw;box-shadow:0 30px 70px -20px rgba(14,16,24,0.4);">
+      <div id="shareStepConfig">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:4px;">Share This Call</div>
+        <p style="font-size:12.5px;color:var(--ink-500);margin:0 0 16px;">Choose exactly what the recipient sees. No login required on their end — nothing beyond what you check here is ever visible to them.</p>
+
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;color:var(--ink-400);margin-bottom:8px;">What to include</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;">
+            <input type="checkbox" id="shareIncludeVideo" checked style="accent-color:var(--teal-600);"> Video
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;">
+            <input type="checkbox" id="shareIncludeOverview" checked style="accent-color:var(--teal-600);"> Overview
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;">
+            <input type="checkbox" id="shareIncludeTranscript" checked style="accent-color:var(--teal-600);"> Transcript
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;">
+            <input type="checkbox" id="shareIncludeCoaching" checked style="accent-color:var(--teal-600);"> Coaching
+          </label>
+        </div>
+
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;color:var(--ink-400);margin-bottom:8px;">Who can access it</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;cursor:pointer;">
+          <input type="radio" name="shareAccessMode" value="anyone" checked style="accent-color:var(--teal-600);"> Anyone with the link
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;cursor:pointer;">
+          <input type="radio" name="shareAccessMode" value="restricted" style="accent-color:var(--teal-600);"> Only specific people
+        </label>
+        <input id="shareEmailsInput" type="text" placeholder="email1@example.com, email2@example.com" style="display:none;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;margin-bottom:16px;box-sizing:border-box;">
+
+        <button id="generateShareLinkBtn" style="width:100%;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:8px;">Generate Link</button>
+        <button id="closeShareModal" style="width:100%;background:transparent;border:none;color:var(--ink-400);font-size:12px;padding:6px;cursor:pointer;">Cancel</button>
+      </div>
+
+      <div id="shareStepLink" style="display:none;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:4px;">Link Ready</div>
+        <p style="font-size:12.5px;color:var(--ink-500);margin:0 0 16px;">Anyone using this link only sees exactly what you selected — nothing else, no account needed.</p>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <input id="shareLinkInput" readonly style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-family:var(--font-mono);background:var(--bg);">
+          <button id="copyShareLinkBtn" style="background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:700;font-size:12.5px;white-space:nowrap;cursor:pointer;">Copy</button>
+        </div>
+        <a id="emailShareLink" href="#" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-700);text-decoration:none;margin-bottom:14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+          Share via Email
+        </a>
+        <button id="doneShareModal" style="width:100%;background:transparent;border:none;color:var(--ink-400);font-size:12px;padding:6px;cursor:pointer;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERNAL SHARE MODAL — owner/admin sharing directly with a teammate -->
+  <div class="modal-overlay" id="shareInternalModalOverlay" style="position:fixed;inset:0;background:rgba(14,16,24,0.5);display:none;align-items:center;justify-content:center;z-index:60;">
+    <div style="background:var(--white);border-radius:var(--radius);padding:24px 26px;width:380px;max-width:90vw;box-shadow:0 30px 70px -20px rgba(14,16,24,0.4);">
+      <div style="font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:4px;">Share with a Teammate</div>
+      <p style="font-size:12.5px;color:var(--ink-500);margin:0 0 16px;">Shows up in their "Shared With Me" tab on Meetings — full access to this call, no external link needed.</p>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-700);display:block;margin-bottom:5px;">Teammate</label>
+      <select id="shareInternalRecipient" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:12px;box-sizing:border-box;">
+        <option value="">Loading teammates…</option>
+      </select>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-700);display:block;margin-bottom:5px;">Note (optional)</label>
+      <input id="shareInternalNote" type="text" maxlength="200" placeholder="e.g. Great example of a consequence question" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:16px;box-sizing:border-box;">
+      <button id="sendInternalShareBtn" style="width:100%;background:linear-gradient(135deg,var(--teal-500),var(--teal-700));color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:8px;">Share This Call</button>
+      <button id="closeShareInternalModal" style="width:100%;background:transparent;border:none;color:var(--ink-400);font-size:12px;padding:6px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ============ TABS ============ -->
+  <div class="tabs" id="tabNav">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="transcript">Transcript</button>
+    <button class="tab-btn" data-tab="coaching">Coaching</button>
+    <button class="tab-btn" data-tab="followups">Follow-Ups</button>
+  </div>
+
+  <div class="review-grid">
+
+    <!-- ============ MAIN COLUMN ============ -->
+    <div>
+
+      <!-- Player — shared across Overview + Transcript -->
+      <div class="player" id="playerBlock">
+        <video id="realVideoPlayer" controls style="width:100%;border-radius:10px;margin-bottom:14px;display:none;background:#000;"></video>
+        <div class="player-top" id="simPlayerControls" style="display:none;padding:40px 20px;text-align:center;flex-direction:column;align-items:center;gap:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32" style="color:var(--ink-400);"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
+          <div style="font-size:13.5px;font-weight:600;color:var(--ink-700);">No recording available for this call</div>
+          <div style="font-size:12px;color:var(--ink-400);">The transcript and scoring below are still real — just no video was captured or saved for this one.</div>
+        </div>
+      </div>
+
+      <!-- OVERVIEW TAB -->
+      <div data-tabcontent="overview" class="active">
+        <div class="panel summary-card">
+          <h3>Executive Summary</h3>
+          <p id="execSummary">—</p>
+        </div>
+
+        <div class="metric-row" id="metricRow"></div>
+
+        <div class="panel" id="talkTimeCard" style="padding:20px 22px;margin-bottom:16px;">
+          <h3 style="margin:0 0 14px;">Who Talked, and How Much</h3>
+          <div id="talkTimeBar" style="position:relative;height:14px;border-radius:8px;overflow:hidden;margin-bottom:10px;background:var(--bg);"></div>
+          <div id="talkTimeLegend" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="panel moments-list">
+          <h3>Key Moments</h3>
+          <div id="momentsListMain"></div>
+        </div>
+      </div>
+
+      <!-- TRANSCRIPT TAB -->
+      <div data-tabcontent="transcript">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
+          <div class="transcript-search" style="margin-bottom:0;flex:1;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input id="transcriptSearch" type="text" placeholder="Search this transcript…">
+          </div>
+          <button id="copyTranscriptBtn" style="background:var(--white);border:1px solid var(--line);border-radius:999px;padding:9px 16px;font-size:12.5px;font-weight:700;color:var(--ink-700);white-space:nowrap;display:flex;align-items:center;gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy Transcript
+          </button>
+        </div>
+        <div class="panel transcript-panel" id="transcriptPanel"></div>
+      </div>
+
+      <!-- COACHING TAB -->
+      <div data-tabcontent="coaching">
+        <div class="coaching-layout">
+
+          <!-- Module tree -->
+          <div class="panel module-tree" id="moduleTree"></div>
+
+          <!-- Detail panel -->
+          <div>
+            <div class="panel detail-panel" id="detailPanel"></div>
+
+            <div class="practice-callout">
+              <div class="eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="13" height="13"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+                Recommended Practice — From This Call
+              </div>
+              <h4 id="practiceModuleName">Loading…</h4>
+              <p id="practiceModuleText">—</p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <a href="roleplay.html" class="practice-callout-cta">
+                  Practice This in Role-Play
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" width="14" height="14"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+                <a href="natural-selling-vault.html" id="practiceVaultLink" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,0.6);text-decoration:none;padding:11px 4px;">Or review the lesson →</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- FOLLOW-UPS TAB -->
+      <div data-tabcontent="followups">
+        <div style="background:var(--amber-100);border:1px solid rgba(192,138,46,0.3);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--amber-600);margin-bottom:14px;" id="followupPlaceholderNote">
+          These are example drafts. Click <strong>Generate Follow-Up</strong> above to create ones based on this specific call.
+        </div>
+
+        <div class="panel followup-card">
+          <div class="followup-head"><h4>Key Points From This Call</h4></div>
+          <ul class="followup-body" id="keyPointsList" style="white-space:normal;margin:0;padding-left:18px;">
+            <li>Generate a follow-up to see the key points from this specific call.</li>
+          </ul>
+        </div>
+
+        <div class="panel followup-card">
+          <div class="followup-head"><h4>Questions Still to Be Answered</h4></div>
+          <ul class="followup-body" id="openQuestionsList" style="white-space:normal;margin:0;padding-left:18px;">
+            <li>—</li>
+          </ul>
+        </div>
+
+        <div class="panel followup-card">
+          <div class="followup-head"><h4>Next Steps — What to Do</h4></div>
+          <ul class="followup-body" id="nextStepsList" style="white-space:normal;margin:0;padding-left:18px;">
+            <li>—</li>
+          </ul>
+        </div>
+
+        <div class="panel followup-card">
+          <div class="followup-head"><h4>How to Follow Up</h4></div>
+          <div class="followup-body" id="howToFollowUpText">—</div>
+        </div>
+
+        <div style="font-family:var(--font-display);font-weight:700;font-size:14px;margin:24px 0 12px;color:var(--ink-700);">AI Follow-Up Guided — Ready to Send</div>
+
+        <div class="panel followup-card">
+          <div class="followup-head">
+            <h4>Follow-Up Email</h4>
+            <button class="copy-btn" data-copy="emailDraft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+          </div>
+          <div class="followup-body" id="emailDraft">Subject: Great talking with you both today
+
+Robert & Diane,
+
+Really enjoyed our conversation this morning — especially getting into what "safe" actually means for the two of you heading into retirement. I want to make sure the numbers we walked through today are still fresh, so I'll send the recap illustration by end of day.
+
+One thing I want to come back to: Diane, you mentioned your mother's care costs earlier — that's worth a proper look together, separate from today's conversation. I'll bring some options next time.
+
+Talk soon,
+Logan</div>
+        </div>
+
+        <div class="panel followup-card">
+          <div class="followup-head">
+            <h4>Follow-Up SMS</h4>
+            <button class="copy-btn" data-copy="smsDraft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+          </div>
+          <div class="followup-body" id="smsDraft">Robert & Diane — great talking this morning. Recap and illustration coming your way by end of day. Talk soon! — Logan</div>
+        </div>
+
+        <div class="panel followup-card">
+          <div class="followup-head">
+            <h4>Next Meeting Agenda</h4>
+            <button class="copy-btn" data-copy="agendaDraft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+          </div>
+          <div class="followup-body" id="agendaDraft">1. Review recap illustration &amp; answer any questions
+2. Revisit legacy bucket — long-term care costs for Diane's mother
+3. Walk through funding timeline
+4. Confirm next steps &amp; paperwork if ready</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============ SIDEBAR ============ -->
+    <div class="panel sidebar-panel">
+      <div class="ring-score-block">
+        <div class="ring-wrap" id="mainRing"></div>
+        <div class="ring-caption">Coach IQ</div>
+      </div>
+      <div class="grade-list">
+        <h4 id="gradingLabelHeader">Natural Selling Grading™</h4>
+        <div id="gradeList"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   MOCK CALL DATA — replace with a live call to your call-detail endpoint.
+   MANUS:FETCH  ->  GET /api/grwth-coach/calls/:id
+   ========================================================================= */
+const MOCK_CALL = {
+  client: 'Robert & Diane Hutchins',
+  score: 91,
+  duration_sec: 2292, // 38:12
+  grades: {
+    'Foundations': { letter: 'A', pct: 96 },
+    'Connecting & Tone': { letter: 'A', pct: 93 },
+    'Situation Questions': { letter: 'A', pct: 90 },
+    'Problem Awareness': { letter: 'B', pct: 82 },
+    'Consequence Questions': { letter: 'A', pct: 94 },
+    'Solution & Commitment': { letter: 'A', pct: 91 },
+    'Objection Reframes': { letter: 'B', pct: 79 },
+    'Live Call Teardown': { letter: 'A', pct: 88 },
+  },
+  summary: "Robert and Diane came in curious but guarded about market risk heading into retirement. The call built rapport quickly, then used a strong consequence question around 14 minutes in to surface a real fear of outliving their savings. The Three-Bucket presentation landed cleanly, and Diane's mention of her mother's long-term care costs is a natural opening for the next conversation. Fee objection was handled and resolved, though it read a little scripted. Overall one of the stronger calls this month.",
+  metrics: [
+    { label: 'Talk-to-Listen', value: '58 / 42', sub: 'On target' },
+    { label: 'Questions Asked', value: '24', sub: '17 open-ended' },
+    { label: 'Buying Signals', value: '5', sub: 'Strong' },
+    { label: 'Objections', value: '1', sub: 'Resolved' },
+  ],
+  moments: [
+    { time: 195, type: 'question', label: 'Situation question opens the money conversation — "Walk me through how your accounts are split right now."' },
+    { time: 500, type: 'buying', label: 'Robert leans in on the guaranteed income floor — "That\'s exactly the piece I don\'t have anywhere else."' },
+    { time: 860, type: 'question', label: 'Consequence question lands — "What happens to the plan if one of you needs care the other can\'t provide?"' },
+    { time: 1265, type: 'buying', label: 'Diane asks directly what it would take to get started — strong forward signal.' },
+    { time: 1780, type: 'objection', label: '"The fees on this feel high compared to what we have now" — objection raised on pricing.' },
+    { time: 1912, type: 'buying', label: 'Objection resolved — Robert acknowledges the fee makes sense given the guarantee.' },
+  ],
+  transcript: [
+    { time: 0, speaker: 'Logan (Agent)', text: 'Robert, Diane — thanks for making the time this morning. Before we get into numbers, I want to understand what "safe" actually means to each of you right now.', tag: null },
+    { time: 40, speaker: 'Robert', text: 'Fair question. For me it\'s not losing what we\'ve built. We\'ve had two bad years watching the account swing and it\'s hard to sleep some nights.', tag: null },
+    { time: 195, speaker: 'Logan (Agent)', text: 'Walk me through how your accounts are split right now — what\'s market-exposed versus what\'s protected?', tag: 'question' },
+    { time: 230, speaker: 'Diane', text: 'Almost all of it is in the 401k still. We rolled a small piece into a CD last year but that\'s it.', tag: null },
+    { time: 500, speaker: 'Robert', text: 'That\'s exactly the piece I don\'t have anywhere else — something that just pays no matter what the market does.', tag: 'buying' },
+    { time: 860, speaker: 'Logan (Agent)', text: 'What happens to the plan if one of you needs care the other can\'t provide? Have you two talked through that?', tag: 'question' },
+    { time: 900, speaker: 'Diane', text: 'Honestly, no. My mother is in a facility right now and it\'s over six thousand a month. That thought scares me more than the market does.', tag: null },
+    { time: 1265, speaker: 'Diane', text: 'So what would it actually take for us to get something like this started?', tag: 'buying' },
+    { time: 1780, speaker: 'Robert', text: 'The fees on this feel high compared to what we have now, though. I want to make sure we\'re not just trading one cost for another.', tag: 'objection' },
+    { time: 1830, speaker: 'Logan (Agent)', text: 'That\'s a fair thing to weigh. What you\'re paying for isn\'t the fee itself — it\'s that the number on the statement can\'t go backward. Does that change how you\'re looking at it?', tag: null },
+    { time: 1912, speaker: 'Robert', text: 'When you put it that way, yeah — it makes more sense given what it\'s actually protecting.', tag: 'buying' },
+    { time: 2100, speaker: 'Logan (Agent)', text: 'I\'ll get the recap and illustration over today. And Diane — let\'s put time on the calendar to talk through the long-term care piece specifically, separate from today.', tag: null },
+  ],
+  coaching_note: "Strong consequence-stage questioning surfaced a real fear around outliving savings — used it well heading into the solution. Objection reframe on fees felt slightly rehearsed; loosen it up next time.",
+};
+
+const TAG_LABELS = { buying: 'Buying Signal', objection: 'Objection', question: 'Key Question' };
+
+/* =========================================================================
+   COACHING MODULES — full per-skill breakdown, one level deeper than the
+   8 Natural Selling Grading™ categories. This is the data behind the
+   Coaching tab's module tree + detail panel.
+   MANUS:FETCH  ->  GET /api/grwth-coach/calls/:id/coaching
+   ========================================================================= */
+const COACHING_MODULES = [
+  { phase: 'Foundations', letter: 'A', score: 96, subs: [
+    { id: 'fnd-open', name: 'Call Opening & Agenda Setting', letter: 'A', score: 97,
+      desc: 'Measures whether the call opened with a clear, mutually agreed agenda before any product or account talk began.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Agenda Clarity', pct: 95 }, { label: 'Time to First Question', pct: 92 } ],
+      hit: ['Agenda stated in the first 90 seconds', 'Both spouses acknowledged the plan for the call', 'No product talk before discovery began'],
+      missed: [],
+      focus: 'Nothing to fix here — this is the standard to replicate on every call.',
+      analysis: "You opened by naming exactly what the next 40 minutes would cover and got a verbal yes from both Robert and Diane before moving anywhere near numbers. That agreement matters more than it seems — it's the reason neither spouse felt ambushed later when consequence questions got personal. This is one of your most consistent strengths across recent calls.",
+      suggestions: [] },
+    { id: 'fnd-rapport', name: 'Rapport Calibration', letter: 'A', score: 94,
+      desc: 'Tracks whether your opening tone matched the client\'s energy rather than defaulting to a fixed script style.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Tone Match Score', pct: 91 }, { label: 'Mutual Talk Early On', pct: 88 } ],
+      hit: ['Matched Robert\'s direct, get-to-it energy without over-explaining', 'Gave Diane space to speak in the first two minutes'],
+      missed: ['A brief personal check-in before business would have warmed Diane specifically, who stayed quieter early'],
+      focus: 'Open with one personal, non-business question when the quieter spouse is present.',
+      analysis: "Robert set a brisk, businesslike tone in the first few seconds and you matched it well. The tradeoff is that Diane, who spoke noticeably less throughout, didn't get an early moment that was clearly hers. It didn't cost you the call — she engaged fully once the consequence questions started — but a single warm, low-stakes question aimed at her directly in the first minute tends to pull quieter spouses in earlier.",
+      suggestions: ['Before the agenda, try: \"Diane, before we dive in — anything specific on your mind coming into this?\" It costs 15 seconds and changes who feels ownership of the call.'] },
+  ]},
+  { phase: 'Connecting & Tone', letter: 'A', score: 93, subs: [
+    { id: 'ct-emotion', name: 'Emotional Tone Matching', letter: 'A', score: 92,
+      desc: 'Whether your vocal pacing and word choice tracked the client\'s emotional state as it shifted through the call.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Tone Shift Response', pct: 90 }, { label: 'Pacing Consistency', pct: 89 } ],
+      hit: ['Slowed down and lowered energy when Diane mentioned her mother\'s care costs', 'Matched Robert\'s more analytical tone during the fee discussion'],
+      missed: [],
+      focus: 'Keep reading for these shifts — this is a genuine strength.',
+      analysis: "The moment Diane brought up her mother, your pace dropped noticeably and you let a beat of silence sit before responding. That's the right instinct — rushing past an emotional disclosure to get back to the agenda is one of the more common ways advisors lose trust mid-call, and you didn't do that here.",
+      suggestions: [] },
+    { id: 'ct-listen', name: 'Active Listening Signals', letter: 'B', score: 84,
+      desc: 'Verbal acknowledgments (reflecting back what was said) that show the client they were actually heard, not just recorded.',
+      confidence: 'Medium Confidence',
+      metrics: [ { label: 'Reflection Frequency', pct: 78 }, { label: 'Accuracy of Reflection', pct: 91 } ],
+      hit: ['Reflected Robert\'s "can\'t sleep some nights" comment back accurately later in the call'],
+      missed: ['Diane\'s mother comment was acknowledged but not reflected back later in the call — a callback near the close would have reinforced it was heard, not just noted'],
+      focus: 'Reflect emotionally significant statements back once more before the call ends, not just in the moment.',
+      analysis: "You have a good habit of acknowledging what clients say in the moment, but the callback — referencing it again later, unprompted — happened for Robert's comment and not Diane's. That asymmetry is subtle but it's the kind of thing that compounds over several calls into one spouse feeling more \"heard\" than the other.",
+      suggestions: ['Near the close, something as simple as: \"And Diane, I haven\'t forgotten what you said about your mom — that\'s exactly what we\'ll dig into next time\" closes the loop.'] },
+  ]},
+  { phase: 'Situation Questions', letter: 'A', score: 90, subs: [
+    { id: 'sit-discovery', name: 'Current-State Discovery', letter: 'A', score: 93,
+      desc: 'How completely you mapped the client\'s actual account structure before moving toward any recommendation.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Account Coverage', pct: 95 }, { label: 'Follow-Up Depth', pct: 88 } ],
+      hit: ['Asked directly what\'s market-exposed vs. protected', 'Uncovered the CD rollover from last year without prompting'],
+      missed: [],
+      focus: 'No gaps here — full picture established early.',
+      analysis: "By the four-minute mark you knew almost the entire account picture, including a detail (the CD rollover) that wasn't in the intake notes. That's a clean discovery phase and it's what made the later consequence question land — you were asking about a specific, real situation instead of a hypothetical one.",
+      suggestions: [] },
+    { id: 'sit-decision', name: 'Decision-Maker Mapping', letter: 'B', score: 80,
+      desc: 'Whether both decision-makers\' individual positions were established, not just the household\'s combined one.',
+      confidence: 'Medium Confidence',
+      metrics: [ { label: 'Individual Check-Ins', pct: 74 }, { label: 'Alignment Confirmed', pct: 86 } ],
+      hit: ['Confirmed both spouses are on the call and engaged as joint decision-makers'],
+      missed: ['Never explicitly asked whether Robert and Diane were already aligned on urgency, or if one was more ready to act than the other'],
+      focus: 'Ask each spouse individually how they\'d rank the urgency of this, even briefly.',
+      analysis: "Robert and Diane appeared aligned by the end of the call, but that alignment was inferred from their reactions rather than confirmed out loud. When two decision-makers are on a call, a quick individual gut-check — even one sentence each — surfaces misalignment before it becomes a stall later (\"let me talk to my spouse about it\").",
+      suggestions: ['Try: \"On a scale of 1 to 10, how urgent does this feel to each of you right now?\" — cheap to ask, and it exposes gaps before they turn into a follow-up delay.'] },
+  ]},
+  { phase: 'Problem Awareness', letter: 'B', score: 82, subs: [
+    { id: 'pa-surface', name: 'Surfacing Unstated Problems', letter: 'B', score: 85,
+      desc: 'Whether questions drew out problems the client hadn\'t already named on their own.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'New Problems Surfaced', pct: 80 }, { label: 'Client-Led Discovery', pct: 90 } ],
+      hit: ['Diane\'s mother\'s long-term care cost came out organically, not from a script prompt'],
+      missed: ['The LTC concern was surfaced but not developed into its own problem thread before the call moved on'],
+      focus: 'When a new problem surfaces mid-question, pause the current thread and develop it before continuing.',
+      analysis: "This is the single biggest opportunity from the call. Diane's comment about her mother wasn't a throwaway line — \"that thought scares me more than the market does\" is about as direct a signal as a client gives. The question that followed moved back toward Robert's original concern instead of staying with Diane's for even one more exchange.",
+      suggestions: ['In the moment, something like: \"Say more about that — has this changed how you think about your own plan?\" keeps the thread open long enough to become its own consequence question later in the same call.'] },
+    { id: 'pa-ownership', name: 'Problem Ownership Language', letter: 'B', score: 79,
+      desc: 'Whether the client stated the problem in their own words, versus you naming it for them.',
+      confidence: 'Medium Confidence',
+      metrics: [ { label: 'Client-Stated Problems', pct: 76 }, { label: 'Agent-Stated Problems', pct: 22 } ],
+      hit: ['Robert named the "can\'t sleep some nights" problem entirely in his own words'],
+      missed: ['The market risk problem was mostly framed by you in the presentation phase rather than restated by the client first'],
+      focus: 'Before presenting the solution, get the client to state the problem back in one sentence.',
+      analysis: "Ownership language is the difference between a client accepting a solution and a client asking for one. Robert's sleep comment was fully his own language, which is why that thread carried weight later. The market-risk framing during the presentation, though, was largely you connecting the dots rather than Robert or Diane stating it first.",
+      suggestions: ['A quick "so if I\'m hearing you right, the real problem is ___ — is that fair?" gets the client to close the loop in their own words before you present anything.'] },
+  ]},
+  { phase: 'Consequence Questions', letter: 'A', score: 94, subs: [
+    { id: 'cq-cost', name: 'Cost-of-Inaction Framing', letter: 'A', score: 96,
+      desc: 'Whether consequence questions connected to a specific, real cost rather than a generic fear.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Specificity Score', pct: 97 }, { label: 'Client Emotional Response', pct: 93 } ],
+      hit: ['"What happens if one of you needs care the other can\'t provide?" tied directly to Diane\'s mother\'s real situation', 'Let the resulting silence sit instead of filling it'],
+      missed: [],
+      focus: 'This is your strongest single skill on this call — keep leading with a real, specific scenario.',
+      analysis: "This is the moment that made the whole call work. Rather than asking a generic \"what happens if the market drops\" question, you tied the consequence directly to a care situation Diane had already described in her own family. That specificity is what produced a genuine emotional response instead of a polite, expected one.",
+      suggestions: [] },
+    { id: 'cq-depth', name: 'Emotional Depth Probing', letter: 'A', score: 91,
+      desc: 'Whether you followed an emotional response with a deeper probe instead of moving straight to solution.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Probe Follow-Through', pct: 88 }, { label: 'Premature Solution Risk', pct: 8 } ],
+      hit: ['Did not pivot to product immediately after Diane\'s response', 'Allowed roughly 4 seconds of silence — rare and valuable restraint'],
+      missed: [],
+      focus: 'No correction needed — this restraint is exactly what separates a strong call from an average one.',
+      analysis: "Most advisors — even experienced ones — fill silence after an emotional moment because it feels uncomfortable. You didn't. That gap is where the client does the internal work of connecting their own fear to the need for a solution, and it's a large part of why the fee objection later resolved as easily as it did.",
+      suggestions: [] },
+  ]},
+  { phase: 'Solution & Commitment', letter: 'A', score: 91, subs: [
+    { id: 'sc-mapping', name: 'Solution Mapping to Stated Needs', letter: 'A', score: 93,
+      desc: 'Whether the solution presented was explicitly tied back to problems the client themselves named.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Callback Density', pct: 90 }, { label: 'Feature-First Language', pct: 12 } ],
+      hit: ['Guaranteed income floor was framed directly against Robert\'s "can\'t sleep" comment', 'No unprompted feature list — solution stayed anchored to stated needs'],
+      missed: [],
+      focus: 'Keep resisting the urge to lead with features — this discipline is working.',
+      analysis: "The solution walkthrough never drifted into a generic product pitch. Every major point traced back to something Robert or Diane had said earlier in the call, which is exactly the sequencing the Three-Bucket framework is built around.",
+      suggestions: [] },
+    { id: 'sc-nextstep', name: 'Next-Step Specificity', letter: 'B', score: 78,
+      desc: 'Whether the commitment ask included a specific date/time rather than an open-ended "let\'s follow up."',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Date/Time Proposed', pct: 40 }, { label: 'Ownership Assigned', pct: 95 } ],
+      hit: ['Clearly took ownership of sending the recap illustration', 'Proposed a follow-up meeting for the LTC conversation'],
+      missed: ['The LTC follow-up was proposed without a specific day or time — left as "let\'s put time on the calendar"'],
+      focus: 'Always leave a call with either a locked date/time, or two specific options to choose from.',
+      analysis: "You closed with clear ownership — the client knows what you're sending and roughly what's next — but the actual next meeting was left open-ended. That's the single most common gap in otherwise strong closes: high confidence and clear ownership, but a soft landing on timing that creates room for the call to slip.",
+      suggestions: ['Replace "let\'s put time on the calendar" with a direct offer: "Would Tuesday at 2pm or Thursday at 10am work better for that conversation?" Two options beats an open invitation almost every time.'] },
+  ]},
+  { phase: 'Objection Reframes', letter: 'B', score: 79, subs: [
+    { id: 'obj-diffusion', name: 'Objection Diffusion', letter: 'A', score: 88,
+      desc: 'Whether the objection was acknowledged and validated before being addressed, rather than argued with directly.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Validation Before Reframe', pct: 92 }, { label: 'Defensive Language', pct: 5 } ],
+      hit: ['Opened the response with "that\'s a fair thing to weigh" before reframing', 'No defensive or justifying tone detected'],
+      missed: [],
+      focus: 'This part of the objection handling is genuinely strong — the reframe below is the only piece to tighten.',
+      analysis: "The fee objection could easily have triggered a defensive, feature-justifying response. Instead you validated it first, which kept Robert open to hearing the reframe that followed rather than feeling like he had to defend his own objection.",
+      suggestions: [] },
+    { id: 'obj-delivery', name: 'Reframe Delivery (Natural vs. Scripted)', letter: 'C', score: 68,
+      desc: 'Whether the reframe language sounded conversational or like a memorized line from the vault.',
+      confidence: 'Medium Confidence',
+      metrics: [ { label: 'Conversational Score', pct: 61 }, { label: 'Vault-Match Similarity', pct: 84 } ],
+      hit: ['The core logic of the reframe — reframing fee as protection — was correct and effective'],
+      missed: ['Phrasing closely mirrored the Vault\'s Module 6 script almost word-for-word, which is where the "rehearsed" read comes from', 'No pause or informal language to break up the delivery'],
+      focus: 'Say the same idea in your own words — same logic, different sentence structure every time.',
+      analysis: "This is the one real ding on an otherwise excellent call. The reframe itself was correct and it worked — Robert came around — but the delivery matched the Vault training script closely enough that a client who's heard a similar pitch elsewhere might clock it as rehearsed. The fix isn't the logic, it's the wording.",
+      suggestions: ['Run this exact objection in the Vault\'s practice mode, but require yourself to paraphrase — same idea, new sentence, every rep — until it stops sounding memorized.', 'Try landing the same reframe with a question instead of a statement: "What if the fee isn\'t really the cost — what would it mean if that number just couldn\'t go backward?"'] },
+  ]},
+  { phase: 'Live Call Teardown', letter: 'A', score: 88, subs: [
+    { id: 'lct-talklisten', name: 'Talk-to-Listen Discipline', letter: 'B', score: 83,
+      desc: 'Whether your share of talk time stayed close to the 55/45 target across the whole call.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Overall Ratio', pct: 58 }, { label: 'Presentation-Phase Ratio', pct: 68 } ],
+      hit: ['Overall call talk time stayed close to target at 58/42'],
+      missed: ['Ratio crept to roughly 68/32 specifically during the solution walkthrough'],
+      focus: 'Add a check-in question every 2–3 sentences during the presentation phase specifically.',
+      analysis: "The call as a whole was well balanced, but the imbalance concentrated entirely in one section — the solution walkthrough — where explaining the guaranteed income floor ran long without a check-in. This is common and easy to fix: it's not an overall pacing problem, it's one specific stretch.",
+      suggestions: ['Break the solution explanation into 2–3 sentence chunks, each followed by a quick check-in like "does that track so far?" before continuing.'] },
+    { id: 'lct-pacing', name: 'Monologue & Pacing Control', letter: 'A', score: 90,
+      desc: 'Longest uninterrupted speaking stretch and overall talking speed relative to target.',
+      confidence: 'High Confidence',
+      metrics: [ { label: 'Longest Monologue', pct: 82 }, { label: 'Talking Speed', pct: 94 } ],
+      hit: ['Longest single monologue was 1m 40s — well within a healthy range', 'Talking speed stayed conversational throughout, no rushed stretches'],
+      missed: [],
+      focus: 'No correction needed here — pacing was well controlled.',
+      analysis: "Even during the longer solution explanation, no single stretch ran long enough to lose the room. Your talking speed also stayed remarkably consistent whether the topic was rapport-building or numbers, which is harder to do than it sounds and is worth recognizing as a strength.",
+      suggestions: [] },
+  ]},
+];
+
+const CALL_MECHANICS = {
+  talk_time: '58.4%', longest_monologue: '1:40', filler_words: '3.1 per min',
+  talking_speed: '148.6 wpm', meaningful_switches: '74 switches', total_questions: '24',
+  total_objections: '1', buying_signals: '5', competitor_mentions: '0',
+};
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/* ---------------------------------------------------------------------
+   Coach IQ ring (signature element, shared with dashboard)
+--------------------------------------------------------------------- */
+function renderMainRing() {
+  const size = 120, strokeW = 8;
+  const radius = size / 2 - strokeW;
+  const circumference = 2 * Math.PI * radius;
+  const pct = MOCK_CALL.score / 100;
+  const offset = circumference * (1 - pct);
+  const isRecruiting = MOCK_CALL.callType === 'recruiting';
+  document.getElementById('mainRing').innerHTML = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <defs>
+        <linearGradient id="gradTealMain" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${isRecruiting ? '#A78BE8' : '#2DD4BF'}"/>
+          <stop offset="100%" stop-color="${isRecruiting ? '#7C5CBF' : '#0D9488'}"/>
+        </linearGradient>
+      </defs>
+      <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="${strokeW}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="url(#gradTealMain)"
+        stroke-width="${strokeW}" stroke-linecap="round"
+        stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/>
+    </svg>
+    <div class="ring-score">${MOCK_CALL.score}</div>
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   Grade list (sidebar)
+--------------------------------------------------------------------- */
+function renderGradeList() {
+  const host = document.getElementById('gradeList');
+  host.innerHTML = Object.entries(MOCK_CALL.grades).map(([name, g]) => `
+    <div class="grade-row">
+      <div class="grade-row-top">
+        <span>${name}</span>
+        <span class="grade-letter ${g.letter}">${g.letter}</span>
+      </div>
+      <div class="grade-bar-track"><div class="grade-bar-fill ${g.letter}" style="width:${g.pct}%"></div></div>
+    </div>
+  `).join('');
+}
+
+/* ---------------------------------------------------------------------
+   Moment jump-to — seeks the real video directly, no custom scrubber
+--------------------------------------------------------------------- */
+function jumpTo(sec) {
+  const videoEl = document.getElementById('realVideoPlayer');
+  if (videoEl.style.display !== 'none') {
+    videoEl.currentTime = sec;
+    videoEl.play();
+  }
+  switchTab('transcript');
+  const target = document.querySelector(`[data-time="${sec}"]`);
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* ---------------------------------------------------------------------
+   Overview tab content
+--------------------------------------------------------------------- */
+function renderOverview() {
+  document.getElementById('execSummary').textContent = MOCK_CALL.summary;
+
+  document.getElementById('metricRow').innerHTML = MOCK_CALL.metrics.map(m => {
+    if (m.label === 'Talk-to-Listen') {
+      const [a, c] = m.value.split(' / ').map(Number);
+      return `
+        <div class="metric-card">
+          <div class="metric-label">${m.label}</div>
+          <div class="metric-value">${m.value}</div>
+          <div class="talk-ratio-bar"><div class="agent" style="width:${a}%"></div><div class="client" style="width:${c}%"></div></div>
+          <div class="talk-ratio-labels"><span>You</span><span>Client</span></div>
+        </div>`;
+    }
+    return `
+      <div class="metric-card">
+        <div class="metric-label">${m.label}</div>
+        <div class="metric-value">${m.value}</div>
+        <div class="metric-sub">${m.sub}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('momentsListMain').innerHTML = MOCK_CALL.moments.map(m => `
+    <div class="moment-row" data-jump="${m.time}">
+      <span class="moment-dot ${m.type}"></span>
+      <span class="moment-time">${fmtTime(m.time)}</span>
+      <span class="moment-text">${m.label}</span>
+    </div>
+  `).join('');
+
+  renderTalkTime();
+
+  document.querySelectorAll('[data-jump]').forEach(el => {
+    el.addEventListener('click', () => jumpTo(Number(el.dataset.jump)));
+  });
+}
+
+/* ---------------------------------------------------------------------
+   Transcript tab content
+--------------------------------------------------------------------- */
+const SPEAKER_COLORS = [
+  'linear-gradient(155deg, var(--teal-400), var(--teal-700))',
+  'linear-gradient(155deg, var(--amber-600), #8a5a1a)',
+  'linear-gradient(155deg, #7c8fd4, #4a5a9e)',
+  'linear-gradient(155deg, #d47ca8, #9e4a72)',
+];
+const speakerColorMap = {};
+function colorForSpeaker(name) {
+  if (!speakerColorMap[name]) {
+    speakerColorMap[name] = SPEAKER_COLORS[Object.keys(speakerColorMap).length % SPEAKER_COLORS.length];
+  }
+  return speakerColorMap[name];
+}
+function initialsForSpeaker(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+}
+
+// Honest approach: we don't have exact per-utterance durations from the
+// transcript, so word count per speaker is used as the speaking-share
+// proxy — a reasonable, defensible approximation, not claimed as exact
+// seconds. Real per-speaker duration would need utterance start/end
+// timestamps, which the transcript source doesn't currently provide.
+// Real, call-specific recommendation — finds the actual lowest-scoring
+// sub-skill from THIS call's real coaching data, instead of a hardcoded
+// "Objection Reframes, Module 6" shown for every call regardless of what
+// actually happened.
+function renderPracticeRecommendation() {
+  const allSubs = COACHING_MODULES.flatMap(mod => (mod.subs || []).map(s => ({ ...s, phase: mod.phase })));
+  if (allSubs.length === 0) return;
+
+  const weakest = allSubs.reduce((worst, s) => (s.score < worst.score ? s : worst), allSubs[0]);
+
+  document.getElementById('practiceModuleName').textContent = `${weakest.phase} — ${weakest.name}`;
+  document.getElementById('practiceModuleText').textContent =
+    weakest.focus || (weakest.suggestions && weakest.suggestions[0]) || 'Review this skill in the Vault based on how this call went.';
+  document.getElementById('practiceVaultLink').href =
+    'natural-selling-vault.html?category=' + encodeURIComponent(weakest.phase);
+}
+
+// Uses REAL transcript timestamps, not a word-count guess — each line's
+// duration is approximated as (next line's start time - this line's
+// start time), which is an honest, standard approach for turn-based
+// conversation (it can't capture true overlapping cross-talk, but
+// accurately reflects who held the floor and for how long).
+function renderTalkTime() {
+  const lines = MOCK_CALL.transcript;
+  if (lines.length === 0) return;
+
+  const totalDuration = MOCK_CALL.duration_sec || (lines[lines.length - 1].time + 10);
+  const speakerSeconds = {};
+  const segments = [];
+
+  lines.forEach((line, i) => {
+    const start = line.time;
+    const end = i < lines.length - 1 ? lines[i + 1].time : Math.min(start + 8, totalDuration);
+    const dur = Math.max(0, end - start);
+    speakerSeconds[line.speaker] = (speakerSeconds[line.speaker] || 0) + dur;
+    segments.push({ speaker: line.speaker, start, dur });
+  });
+
+  // Chronological timeline — a real strip across the full call, not just
+  // an aggregate bar, so patterns (long monologues, rapid back-and-forth)
+  // are visible at a glance.
+  document.getElementById('talkTimeBar').innerHTML = segments.map(seg => {
+    const leftPct = (seg.start / totalDuration) * 100;
+    const widthPct = Math.max(0.3, (seg.dur / totalDuration) * 100);
+    return `<div style="position:absolute;left:${leftPct}%;width:${widthPct}%;height:100%;background:${colorForSpeaker(seg.speaker)};" title="${seg.speaker} at ${fmtTime(seg.start)}"></div>`;
+  }).join('');
+
+  const speakers = Object.entries(speakerSeconds).sort((a, b) => b[1] - a[1]);
+  const totalSpeaking = speakers.reduce((sum, [, s]) => sum + s, 0);
+
+  document.getElementById('talkTimeLegend').innerHTML = speakers.map(([name, secs]) => {
+    const pct = totalSpeaking > 0 ? Math.round((secs / totalSpeaking) * 100) : 0;
+    const mins = Math.floor(secs / 60);
+    const rem = Math.round(secs % 60);
+    return `
+      <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;">
+        <span style="width:10px;height:10px;border-radius:3px;background:${colorForSpeaker(name)};display:inline-block;"></span>
+        <strong>${name}</strong><span style="color:var(--ink-400);">${mins}:${rem.toString().padStart(2,'0')} · ${pct}%</span>
+      </div>`;
+  }).join('');
+}
+
+function renderTranscript(filter = '') {
+  const host = document.getElementById('transcriptPanel');
+  const rows = MOCK_CALL.transcript.filter(t =>
+    !filter || t.text.toLowerCase().includes(filter.toLowerCase()) || t.speaker.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  if (rows.length === 0) {
+    host.innerHTML = `<div style="padding:30px 20px;text-align:center;color:var(--ink-400);font-size:13px;">No matching lines in this transcript.</div>`;
+    return;
+  }
+
+  host.innerHTML = rows.map(t => `
+    <div class="t-row ${t.tag ? 'tag-' + t.tag : ''}" data-time="${t.time}">
+      <div class="t-time">${fmtTime(t.time)}</div>
+      <div class="t-avatar" style="background:${colorForSpeaker(t.speaker)}">${initialsForSpeaker(t.speaker)}</div>
+      <div>
+        <div class="t-speaker">${t.speaker}${t.tag ? `<span class="tag-pill ${t.tag}">${TAG_LABELS[t.tag]}</span>` : ''}</div>
+        <div class="t-text">${t.text}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('transcriptSearch').addEventListener('input', e => renderTranscript(e.target.value));
+
+document.getElementById('copyTranscriptBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('copyTranscriptBtn');
+  const fullText = MOCK_CALL.transcript
+    .map(line => {
+      const mins = Math.floor(line.time / 60);
+      const secs = String(line.time % 60).padStart(2, '0');
+      return `[${mins}:${secs}] ${line.speaker}: ${line.text}`;
+    })
+    .join('\n\n');
+  try {
+    await navigator.clipboard.writeText(fullText);
+    const original = btn.innerHTML;
+    btn.innerHTML = 'Copied!';
+    setTimeout(() => { btn.innerHTML = original; }, 1500);
+  } catch (err) {
+    console.error('Clipboard write failed', err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   Coaching: module tree + detail panel
+--------------------------------------------------------------------- */
+let activeModuleId = COACHING_MODULES[0].subs[0].id;
+
+function renderModuleTree() {
+  const host = document.getElementById('moduleTree');
+  const totalSubs = COACHING_MODULES.reduce((sum, p) => sum + p.subs.length, 0);
+
+  host.innerHTML = `
+    <div class="module-tree-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      <span>Communication Modules</span>
+    </div>
+    <div class="module-tree-count">${totalSubs} skills across 8 categories</div>
+    ${COACHING_MODULES.map((phase, pi) => `
+      <div class="phase-group" data-phase="${pi}">
+        <button class="phase-header" data-toggle="${pi}">
+          <span class="phase-badge ${phase.letter}">${phase.letter}</span>
+          <span>${phase.phase}</span>
+          <svg class="phase-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="sub-list">
+          ${phase.subs.map(sub => `
+            <button class="sub-item ${sub.id === activeModuleId ? 'active' : ''}" data-sub="${sub.id}">
+              <span class="mini-badge ${sub.letter}">${sub.letter}</span>
+              <span>${sub.name}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+    <button class="mechanics-link" data-sub="mechanics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-6"/></svg>
+      Call Mechanics
+    </button>
+  `;
+
+  host.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.phase-group').classList.toggle('collapsed');
+    });
+  });
+
+  host.querySelectorAll('[data-sub]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeModuleId = btn.dataset.sub;
+      renderModuleTree();
+      renderDetailPanel();
+    });
+  });
+}
+
+function findModule(id) {
+  for (const phase of COACHING_MODULES) {
+    const sub = phase.subs.find(s => s.id === id);
+    if (sub) return sub;
+  }
+  return null;
+}
+
+function renderDetailPanel() {
+  const host = document.getElementById('detailPanel');
+
+  if (activeModuleId === 'mechanics') {
+    host.innerHTML = `
+      <div class="detail-top">
+        <div class="detail-title">Call Mechanics</div>
+      </div>
+      <div class="detail-desc">Raw speaking metrics tracked across the full call — talk time, pacing, filler words, and mention counts.</div>
+      <div class="mechanics-grid">
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Talk Time</div><div class="mechanics-cell-value">${CALL_MECHANICS.talk_time}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Longest Monologue</div><div class="mechanics-cell-value">${CALL_MECHANICS.longest_monologue}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Filler Words</div><div class="mechanics-cell-value">${CALL_MECHANICS.filler_words}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Talking Speed</div><div class="mechanics-cell-value">${CALL_MECHANICS.talking_speed}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Meaningful Switches</div><div class="mechanics-cell-value">${CALL_MECHANICS.meaningful_switches}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Questions Asked</div><div class="mechanics-cell-value">${CALL_MECHANICS.total_questions}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Objections Raised</div><div class="mechanics-cell-value">${CALL_MECHANICS.total_objections}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Buying Signals</div><div class="mechanics-cell-value">${CALL_MECHANICS.buying_signals}</div></div>
+        <div class="mechanics-cell"><div class="mechanics-cell-label">Competitor Mentions</div><div class="mechanics-cell-value">${CALL_MECHANICS.competitor_mentions}</div></div>
+      </div>
+    `;
+    return;
+  }
+
+  const m = findModule(activeModuleId);
+  if (!m) return;
+
+  host.innerHTML = `
+    <div class="detail-top">
+      <div class="detail-title">${m.name}</div>
+      <div class="detail-score-badge ${m.letter}">${m.letter} · ${m.score}</div>
+    </div>
+    <div class="detail-desc">${m.desc}</div>
+    <div class="confidence-pill"><span class="confidence-dot"></span>${m.confidence}</div>
+
+    <div class="detail-metrics">
+      ${m.metrics.map(met => {
+        const isRealPct = met.pct <= 100;
+        const displayValue = isRealPct ? met.pct + '%' : met.pct;
+        const barWidth = isRealPct ? met.pct : 100; // non-percentage values just show a full bar — the number itself is the point, not proportion
+        return `
+        <div>
+          <div class="detail-metric-label"><span>${met.label}</span><strong>${displayValue}</strong></div>
+          <div class="detail-metric-track"><div class="detail-metric-fill" style="width:${barWidth}%"></div></div>
+        </div>
+      `;
+      }).join('')}
+    </div>
+
+    <div class="hit-missed-grid">
+      <div>
+        <div class="hm-col-label hit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>What You Hit</div>
+        ${m.hit.length ? m.hit.map(h => `<div class="hm-item hit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>${h}</div>`).join('') : '<div class="hm-empty">Nothing flagged.</div>'}
+      </div>
+      <div>
+        <div class="hm-col-label miss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>What You Missed</div>
+        ${m.missed.length ? m.missed.map(h => `<div class="hm-item miss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>${h}</div>`).join('') : '<div class="hm-empty">Nothing missed — clean on this skill.</div>'}
+      </div>
+    </div>
+
+    <div class="focus-callout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div>
+        <div class="focus-callout-label">#1 Focus Area</div>
+        <div class="focus-callout-text">${m.focus}</div>
+      </div>
+    </div>
+
+    <div class="detail-analysis">${m.analysis}</div>
+
+    ${m.suggestions.length ? `
+      <div class="suggestions-label">Suggestions for Improvement</div>
+      ${m.suggestions.map((s, i) => `
+        <div class="suggestion-item">
+          <div class="suggestion-num">${i + 1}</div>
+          <div class="suggestion-text">${s}</div>
+        </div>
+      `).join('')}
+    ` : ''}
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   Tabs
+--------------------------------------------------------------------- */
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('[data-tabcontent]').forEach(el => el.classList.toggle('active', el.dataset.tabcontent === name));
+  document.getElementById('playerBlock').style.display = (name === 'overview' || name === 'transcript') ? 'block' : 'none';
+}
+
+document.getElementById('tabNav').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  switchTab(btn.dataset.tab);
+});
+
+/* ---------------------------------------------------------------------
+   Copy-to-clipboard on Follow-Ups tab
+--------------------------------------------------------------------- */
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const text = document.getElementById(btn.dataset.copy).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = btn.innerHTML;
+      btn.innerHTML = 'Copied';
+      setTimeout(() => { btn.innerHTML = original; }, 1500);
+    } catch (err) {
+      console.error('Clipboard write failed', err);
+    }
+  });
+});
+
+/* ---------------------------------------------------------------------
+   Live API wiring — falls back to MOCK_CALL / COACHING_MODULES /
+   CALL_MECHANICS above if the backend isn't reachable. Set
+   window.GRWTH_API_BASE, window.GRWTH_ADVISOR_ID, and window.GRWTH_CALL_ID
+   (the real Call.id) before this script runs — e.g. the dashboard/meetings
+   pages should set GRWTH_CALL_ID in localStorage before navigating here.
+
+   Shared links (from the Share button) pass ?call=X&advisor=Y in the URL
+   instead of relying on localStorage, since the recipient's browser won't
+   have that saved — URL params take priority when present. NOTE: this
+   means anyone with the link can view this call — there's no per-share
+   access control. Fine for internal sharing between advisors/managers on
+   the same team; revisit before sharing outside the company.
+--------------------------------------------------------------------- */
+const urlParams = new URLSearchParams(window.location.search);
+const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+const ADVISOR_ID = urlParams.get('advisor') || window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+const CALL_ID = urlParams.get('call') || window.GRWTH_CALL_ID || localStorage.getItem('grwth_call_id') || '';
+
+async function fetchJSON(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include', ...options, headers: { 'x-advisor-id': ADVISOR_ID, ...(options.headers || {}) } });
+  if (!res.ok) {
+    // Real fix — this used to discard the response body entirely on
+    // error, so a genuine paywall/entitlement block looked identical
+    // to a network failure to any caller, and this page in particular
+    // silently fell back to fully hardcoded fake call data ("Robert &
+    // Diane") with zero visible indication anything went wrong. Now
+    // the real error body rides along on the thrown Error so callers
+    // can show the actual reason.
+    let body = null;
+    try { body = await res.json(); } catch { /* not JSON, ignore */ }
+    const err = new Error(body?.error || `API ${res.status} on ${path}`);
+    err.status = res.status;
+    err.entitlementBlocked = !!body?.entitlementBlocked;
+    throw err;
+  }
+  return res.json();
+}
+
+/* ---------------------------------------------------------------------
+   Share, Export, Delete — previously dead buttons, now real
+--------------------------------------------------------------------- */
+// Internal sharing — only owner/admin can share directly with a teammate
+(function () {
+  const role = localStorage.getItem('grwth_advisor_role');
+  if (role === 'agency_owner' || role === 'admin') {
+    document.getElementById('shareInternalBtn').style.display = 'inline-flex';
+  }
+})();
+
+document.getElementById('shareInternalBtn').addEventListener('click', async () => {
+  document.getElementById('shareInternalModalOverlay').style.display = 'flex';
+  const select = document.getElementById('shareInternalRecipient');
+  select.innerHTML = '<option value="">Loading teammates…</option>';
+  try {
+    const team = await fetchJSON('/api/grwth-coach/team');
+    const others = (team.advisors || team).filter(a => a.id !== ADVISOR_ID);
+    if (others.length === 0) {
+      select.innerHTML = '<option value="">No other teammates yet</option>';
+      return;
+    }
+    select.innerHTML = others.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  } catch (err) {
+    select.innerHTML = '<option value="">Couldn\'t load teammates</option>';
+  }
+});
+document.getElementById('closeShareInternalModal').addEventListener('click', () => {
+  document.getElementById('shareInternalModalOverlay').style.display = 'none';
+});
+document.getElementById('sendInternalShareBtn').addEventListener('click', async () => {
+  const recipientId = document.getElementById('shareInternalRecipient').value;
+  if (!recipientId) { alert('Pick a teammate first.'); return; }
+  const note = document.getElementById('shareInternalNote').value.trim();
+  const btn = document.getElementById('sendInternalShareBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sharing…';
+  try {
+    await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}/share-internal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sharedWithId: recipientId, note: note || undefined }),
+    });
+    document.getElementById('shareInternalModalOverlay').style.display = 'none';
+    btn.textContent = 'Share This Call';
+    btn.disabled = false;
+    alert('Shared — they\'ll see it in their "Shared With Me" tab on Meetings.');
+  } catch (err) {
+    alert(`Couldn't share this call: ${err.message}`);
+    btn.textContent = 'Share This Call';
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('shareBtn').addEventListener('click', () => {
+  document.getElementById('shareStepConfig').style.display = 'block';
+  document.getElementById('shareStepLink').style.display = 'none';
+  document.getElementById('shareModalOverlay').style.display = 'flex';
+});
+document.getElementById('closeShareModal').addEventListener('click', () => {
+  document.getElementById('shareModalOverlay').style.display = 'none';
+});
+document.getElementById('doneShareModal').addEventListener('click', () => {
+  document.getElementById('shareModalOverlay').style.display = 'none';
+});
+document.querySelectorAll('input[name="shareAccessMode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.getElementById('shareEmailsInput').style.display =
+      document.querySelector('input[name="shareAccessMode"]:checked').value === 'restricted' ? 'block' : 'none';
+  });
+});
+document.getElementById('generateShareLinkBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('generateShareLinkBtn');
+  const accessMode = document.querySelector('input[name="shareAccessMode"]:checked').value;
+  const emailsRaw = document.getElementById('shareEmailsInput').value.trim();
+  const allowedEmails = emailsRaw ? emailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+
+  if (accessMode === 'restricted' && allowedEmails.length === 0) {
+    alert('Enter at least one email address, or switch to "Anyone with the link."');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try {
+    const result = await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        includeVideo: document.getElementById('shareIncludeVideo').checked,
+        includeOverview: document.getElementById('shareIncludeOverview').checked,
+        includeTranscript: document.getElementById('shareIncludeTranscript').checked,
+        includeCoaching: document.getElementById('shareIncludeCoaching').checked,
+        accessMode,
+        allowedEmails,
+      }),
+    });
+
+    const shareUrl = `${window.location.origin}/shared-call.html?token=${result.token}`;
+    document.getElementById('shareLinkInput').value = shareUrl;
+    document.getElementById('emailShareLink').href =
+      `mailto:?subject=${encodeURIComponent('GRWTH Coach — Call Review')}&body=${encodeURIComponent('Take a look at this call review: ' + shareUrl)}`;
+    document.getElementById('shareStepConfig').style.display = 'none';
+    document.getElementById('shareStepLink').style.display = 'block';
+  } catch (err) {
+    alert(`Couldn't create the share link: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Link';
+  }
+});
+document.getElementById('copyShareLinkBtn').addEventListener('click', async () => {
+  const input = document.getElementById('shareLinkInput');
+  input.select();
+  try {
+    await navigator.clipboard.writeText(input.value);
+    const btn = document.getElementById('copyShareLinkBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (err) {
+    console.error('Clipboard write failed', err);
+  }
+});
+
+document.getElementById('deleteBtn').addEventListener('click', async () => {
+  if (!CALL_ID) return;
+  const confirmed = confirm('Delete this call permanently? This removes the recording, transcript, and all scoring data. This cannot be undone.');
+  if (!confirmed) return;
+  try {
+    await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}`, { method: 'DELETE' });
+    window.location.href = 'meetings.html';
+  } catch (err) {
+    alert(`Couldn't delete this call: ${err.message}`);
+  }
+});
+
+// Generate Follow-Up — was previously just a static example. Now calls
+// the real scoring engine's follow-up generator, scoped to THIS call.
+document.getElementById('generateFollowupBtn').addEventListener('click', async () => {
+  if (!CALL_ID) { switchTab('followups'); return; }
+
+  const btn = document.getElementById('generateFollowupBtn');
+  const btnText = document.getElementById('generateFollowupBtnText');
+  btn.disabled = true;
+  btnText.textContent = 'Generating…';
+
+  try {
+    const drafts = await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}/generate-followup`, { method: 'POST' });
+    document.getElementById('emailDraft').textContent = drafts.email;
+    document.getElementById('smsDraft').textContent = drafts.sms;
+    document.getElementById('agendaDraft').textContent = drafts.agenda;
+
+    document.getElementById('keyPointsList').innerHTML =
+      (drafts.keyPoints || []).map(p => `<li>${p}</li>`).join('') || '<li>No key points generated.</li>';
+    document.getElementById('openQuestionsList').innerHTML =
+      (drafts.openQuestions || []).map(q => `<li>${q}</li>`).join('') || '<li>Nothing left open from this call.</li>';
+    document.getElementById('nextStepsList').innerHTML =
+      (drafts.nextSteps || []).map(s => `<li>${s}</li>`).join('') || '<li>No next steps generated.</li>';
+    document.getElementById('howToFollowUpText').textContent = drafts.howToFollowUp || '—';
+
+    document.getElementById('followupPlaceholderNote').style.display = 'none';
+    switchTab('followups');
+  } catch (err) {
+    console.error('[GRWTH Coach] Follow-up generation failed:', err);
+    alert(`Couldn't generate a follow-up: ${err.message}. Showing example drafts instead — these are NOT specific to this call.`);
+    switchTab('followups');
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = 'Generate Follow-Up';
+  }
+});
+
+async function loadLiveData() {
+  if (!ADVISOR_ID || !CALL_ID) { console.warn('[GRWTH Coach] No advisor/call ID configured — using mock data.'); return; }
+  try {
+    const [call, coaching] = await Promise.all([
+      fetchJSON(`/api/grwth-coach/calls/${CALL_ID}`),
+      fetchJSON(`/api/grwth-coach/calls/${CALL_ID}/coaching`),
+    ]);
+    Object.assign(MOCK_CALL, call);
+    if (document.getElementById('leadSourceSelect')) {
+      document.getElementById('leadSourceSelect').value = call.leadSource || '';
+    }
+    COACHING_MODULES.length = 0; COACHING_MODULES.push(...coaching.modules);
+    Object.assign(CALL_MECHANICS, coaching.mechanics);
+    activeModuleId = COACHING_MODULES[0]?.subs?.[0]?.id ?? activeModuleId;
+    renderPracticeRecommendation();
+
+    document.getElementById('breadcrumbName').textContent = call.client;
+    document.getElementById('callTitleInput').value = call.client;
+    setupEditableCallTitle(call.client);
+    document.getElementById('callTitlePlatform').textContent = call.platform || '—';
+    if (call.callType === 'recruiting') {
+      document.getElementById('callTitleTypeBadge').style.display = 'inline-block';
+      document.querySelector('.sidebar-panel').classList.add('recruiting');
+      document.getElementById('gradingLabelHeader').textContent = 'Recruiting Call Grading';
+    }
+    if (call.date) {
+      const d = new Date(call.date);
+      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const mins = Math.round((call.duration_sec || 0) / 60);
+      document.getElementById('callTitleMeta').textContent = `${dateStr} · ${timeStr} · ${mins} min`;
+    }
+    document.title = call.client + ' — GRWTH Coach';
+
+    if (call.videoUrl) {
+      const videoEl = document.getElementById('realVideoPlayer');
+      // Recall's stored video URLs are signed and expire after 5 hours
+      // — the reason older calls stopped playing at all. Fetching a
+      // fresh one right when the page actually loads is Recall's own
+      // recommended fix instead of trusting whatever was stored at
+      // processing time.
+      try {
+        const fresh = await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}/video-url`);
+        if (fresh.videoUrl) {
+          videoEl.src = fresh.videoUrl;
+          videoEl.style.display = 'block';
+          document.getElementById('simPlayerControls').style.display = 'none';
+        } else {
+          document.getElementById('simPlayerControls').style.display = 'flex';
+        }
+      } catch (videoErr) {
+        console.warn('[GRWTH Coach] Could not fetch fresh video URL:', videoErr.message);
+        document.getElementById('simPlayerControls').style.display = 'flex';
+      }
+    } else {
+      document.getElementById('simPlayerControls').style.display = 'flex';
+    }
+  } catch (err) {
+    console.warn('[GRWTH Coach] Live API unavailable:', err.message);
+    // Real fix — previously silent: any error here (paywall, network,
+    // permissions) left the page showing fully fake, hardcoded call
+    // data with no indication anything was wrong. Now the person sees
+    // the real, honest reason instead.
+    const main = document.querySelector('.review-grid') || document.querySelector('.page') || document.body;
+    const message = err.entitlementBlocked
+      ? "You've used your free reviews for today — come back tomorrow, or subscribe for unlimited reviews."
+      : "This call couldn't be loaded right now. Please try again in a moment.";
+    main.innerHTML = `
+      <div style="max-width:480px;margin:80px auto;text-align:center;padding:32px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);">
+        <div style="font-size:16px;font-weight:700;color:var(--ink-900);margin-bottom:8px;">Can't show this call right now</div>
+        <div style="font-size:13.5px;color:var(--ink-500);line-height:1.5;margin-bottom:20px;">${message}</div>
+        <a href="meetings.html?tab=past" style="display:inline-block;background:var(--teal-600);color:#fff;font-size:13px;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;">Back to Meetings</a>
+      </div>`;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Init
+--------------------------------------------------------------------- */
+document.getElementById('backBtn').addEventListener('click', () => {
+  window.location.href = 'meetings.html';
+});
+
+document.getElementById('leadSourceSelect').addEventListener('change', async (e) => {
+  const value = e.target.value;
+  if (!value) return;
+  try {
+    await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadSource: value }),
+    });
+  } catch (err) {
+    alert(`Couldn't save lead source: ${err.message}`);
+  }
+});
+
+function setupEditableCallTitle(originalTitle) {
+  const input = document.getElementById('callTitleInput');
+  const saveBtn = document.getElementById('saveCallTitleBtn');
+  const width = Math.max(200, originalTitle.length * 13);
+  input.style.width = width + 'px';
+
+  input.addEventListener('input', () => {
+    input.style.width = Math.max(200, input.value.length * 13) + 'px';
+    saveBtn.style.display = input.value.trim() && input.value.trim() !== originalTitle ? 'inline-block' : 'none';
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newTitle = input.value.trim();
+    if (!newTitle) return;
+    saveBtn.textContent = 'Saving…';
+    try {
+      await fetchJSON(`/api/grwth-coach/calls/${CALL_ID}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientName: newTitle }),
+      });
+      document.getElementById('breadcrumbName').textContent = newTitle;
+      document.title = newTitle + ' — GRWTH Coach';
+      saveBtn.style.display = 'none';
+      saveBtn.textContent = 'Save';
+    } catch (err) {
+      alert(`Couldn't rename this call: ${err.message}`);
+      saveBtn.textContent = 'Save';
+    }
+  });
+}
+
+(async function init() {
+  await loadLiveData();
+  renderMainRing();
+  renderGradeList();
+  renderOverview();
+  renderTranscript();
+  renderModuleTree();
+  renderDetailPanel();
+})();
+</script>
+
+</body>
+</html>

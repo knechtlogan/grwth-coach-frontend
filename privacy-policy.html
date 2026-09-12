@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<title>GRWTH Coach Extension — Privacy Policy</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 720px; margin: 60px auto; padding: 0 24px; line-height: 1.6; color: #12141F; }
+  h1 { font-size: 26px; }
+  h2 { font-size: 18px; margin-top: 32px; }
+  .updated { color: #6B7280; font-size: 13px; margin-bottom: 30px; }
+</style>
+</head>
+<body>
+
+<h1>GRWTH Coach — Privacy Policy</h1>
+<p class="updated">Last updated: August 2026</p>
+
+<p>This policy explains what data GRWTH Coach — including the web application and its companion Chrome extension — accesses, how it's used, and how it's protected. GRWTH Coach is an AI-powered sales and recruiting call coaching platform for insurance and financial services agencies.</p>
+
+<h2>What the extension reads</h2>
+<p>When you're logged into the GRWTH Coach web app in your browser, the extension reads your own agent ID from that logged-in session — the same identifier already used by the web app itself. This happens automatically so you never have to manually enter or configure it.</p>
+
+<h2>What the extension sends</h2>
+<p>When you click "Send Recall Bot to This Meeting" or paste a meeting link, the extension sends that meeting URL and your agent ID to the GRWTH Coach backend, which uses this information to dispatch a recording bot to your meeting on your behalf.</p>
+
+<h2>What the extension does NOT do</h2>
+<ul>
+  <li>It does not record, capture, or transmit any audio or video directly from your browser.</li>
+  <li>It does not access, read, or transmit the content of any web page other than reading your own agent ID from the GRWTH Coach app itself.</li>
+  <li>It does not share any data with third parties other than the GRWTH Coach backend, which is operated by the same organization that built this extension.</li>
+  <li>It does not use cookies, trackers, or advertising identifiers.</li>
+</ul>
+
+<h2>Data storage</h2>
+<p>Your agent ID and a display name for your recording bot are stored locally in your browser's extension storage (chrome.storage.local), accessible only to this extension.</p>
+
+<h2>Google User Data — What We Access, How We Use It, and How It's Protected</h2>
+
+<h3>What Google Calendar data we access</h3>
+<p>With your permission, GRWTH Coach reads the following from your Google Calendar: event start and end time, event title, and any meeting link (Zoom, Google Meet, or Teams) included in the event. We use the calendar.readonly scope, which is read-only — we never create, modify, or delete any calendar event.</p>
+
+<h3>How we use this data</h3>
+<p>This data is used solely to detect when a scheduled sales or recruiting call is about to begin, and — for meetings where you've enabled Auto-Recording — to automatically schedule a recording bot to join before the meeting's start time. Nothing else.</p>
+
+<h3>Who we share this data with</h3>
+<p>Google Calendar data (event time, title, meeting link) is never shared with, sold to, or transferred to any third party, including any AI service provider. It is used exclusively within our own infrastructure to power the auto-recording scheduling feature described above.</p>
+
+<h3>Data protection</h3>
+<p>Calendar access tokens are encrypted at rest. Access to calendar data within our systems is restricted to the automated scheduling process described above; no GRWTH Coach employee manually views raw calendar data as part of normal operations.</p>
+
+<h3>Data retention and deletion</h3>
+<p>Calendar event metadata is retained only as long as needed to support the auto-recording feature and is deleted when the associated event has passed, or immediately if you disconnect your Google Calendar integration in Settings. You can disconnect at any time, which immediately revokes our access and stops any further data collection.</p>
+
+<h3>AI and Limited Use compliance</h3>
+<p>GRWTH Coach uses the Anthropic API (Claude) to analyze call transcripts and provide AI-generated sales coaching feedback. Google Calendar data is never sent to Anthropic or any AI/ML service — only the call transcript itself (separate from and unrelated to any Google API data) is processed by Anthropic. The use of any data received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. We do not use Google user data to train, improve, or fine-tune any AI or machine learning model, foundational or otherwise.</p>
+
+<h2>Google Gmail Data — What We Access, How We Use It, and How It's Protected</h2>
+
+<h3>What Gmail permission we request</h3>
+<p>With your explicit, opt-in permission, GRWTH Coach can send an email on your behalf using the gmail.send scope. This is a send-only permission: GRWTH Coach cannot read, search, view, or otherwise access any existing email, draft, or content already in your Gmail inbox.</p>
+
+<h3>How we use this permission</h3>
+<p>After a meeting you recorded has been scored, you may optionally enable "Email recording to attendees" in Settings. This feature is off by default and must be turned on by you. When enabled, and only when enabled, GRWTH Coach uses the gmail.send scope to send a single email containing a link to that meeting's recording and transcript to the attendees of that specific meeting.</p>
+
+<h3>Who we share this data with</h3>
+<p>The gmail.send permission is never shared with, sold to, or transferred to any third party, including any AI service provider. It is used exclusively within our own infrastructure to send the specific, user-initiated email described above.</p>
+
+<h3>Data protection</h3>
+<p>Gmail access tokens are encrypted at rest, using the same protections applied to Calendar access tokens described above. Access is restricted to the automated email-sending process described above; no GRWTH Coach employee manually uses this permission as part of normal operations.</p>
+
+<h3>Data retention and deletion</h3>
+<p>GRWTH Coach does not retain any Gmail message content, since this permission is send-only and involves no reading or storage of inbox data. You can disable "Email recording to attendees" in Settings at any time, and can fully revoke Gmail access by disconnecting your Google Calendar integration, which immediately revokes all associated Google permissions including gmail.send.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy can be directed to the GRWTH Coach team through the GRWTH Coach web application.</p>
+
+</body>
+</html>

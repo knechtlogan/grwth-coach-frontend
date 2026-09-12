@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRWTH Coach — Role-Play</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+
+<!--
+  =========================================================================
+  GRWTH COACH — ROLE-PLAY BOT (VOICE)
+
+  HOW THIS ACTUALLY WORKS, HONESTLY:
+  - Speech-to-TEXT (what the advisor says) happens IN THE BROWSER using
+    the free, built-in SpeechRecognition API. Works well in Chrome; Safari
+    support is partial; Firefox doesn't support it at all as of this build.
+  - Text-to-SPEECH (the prospect's voice) is real, premium-quality audio
+    from Inworld TTS (see lib/integrations/inworldTTS.ts on the backend) —
+    independently ranked #1 in quality benchmarks, chosen over ElevenLabs
+    since this doesn't need voice cloning, just natural-sounding voices.
+    If that ever fails (bad API key, provider hiccup), this page falls
+    back to the browser's free built-in voice automatically rather than
+    breaking the session.
+  - The actual conversation intelligence (what the "prospect" says, how
+    they react, when they raise objections) is real Claude, not scripted.
+  =========================================================================
+-->
+
+<style>
+  :root {
+    --teal-700: #0B7A70; --teal-600: #0D9488; --teal-500: #14B8A6; --teal-400: #2DD4BF;
+    --slate-950: #0E1018; --slate-900: #1A1A2E;
+    --bg: #F4F6F8; --white: #FFFFFF;
+    --ink-900: #12141F; --ink-700: #2E3244; --ink-500: #6B7280; --ink-400: #9098A8;
+    --line: #E4E7EC; --rose-600: #D5493A; --rose-100: #FBE6E3;
+    --amber-600: #C08A2E; --amber-100: #FBF1DD;
+    --teal-100: #E3F5F2;
+    --font-display: 'Geist', -apple-system, sans-serif;
+    --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+    --radius: 16px; --radius-sm: 10px;
+    --shadow-card: 0 1px 2px rgba(14,16,24,0.04), 0 12px 28px -14px rgba(14,16,24,0.14);  }
+
+  html[data-theme="dark"] {
+    --bg: #0B0E17;
+    --white: #121A29;
+    --ink-900: #FFFFFF;
+    --ink-700: #E4E7EC;
+    --ink-500: #9098A8;
+    --ink-400: #6B7280;
+    --ink-300: #363C54;
+    --line: #1D2C42;
+    --amber-100: #2E230F;
+    --rose-100: #2E1512;
+    --teal-100: #0E262A;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); font-family: var(--font-body); color: var(--ink-900); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--white); color: var(--ink-700); padding: 22px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 20px 8px; margin-bottom: 12px; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(155deg, var(--teal-400), var(--teal-600)); box-shadow: 0 4px 12px -4px rgba(13,148,136,0.5); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; }
+  .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--ink-900); }
+  .brand-sub { font-size: 9.5px; color: var(--teal-600); text-transform: uppercase; letter-spacing: 1.3px; font-weight: 700; }
+  .org-card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+  .org-card-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-bottom: 3px; }
+  .org-card-name { font-size: 13px; font-weight: 700; color: var(--ink-900); margin-bottom: 6px; }
+  .org-badge { display: inline-block; font-size: 10px; font-weight: 700; color: var(--teal-700); background: var(--teal-100); padding: 2px 8px; border-radius: 999px; }
+  .nav-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--ink-400); padding: 0 12px; margin-bottom: 6px; }
+  .nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 9px; font-size: 13.5px; font-weight: 500; color: var(--ink-500); text-decoration: none; background: transparent; border: none; width: 100%; text-align: left; transition: background 0.15s ease, color 0.15s ease; }
+  .nav-item:hover { background: var(--bg); color: var(--ink-900); }
+  .nav-item.active { background: var(--teal-100); color: var(--teal-700); font-weight: 700; }
+  .nav-icon { width: 17px; height: 17px; flex-shrink: 0; }
+  .sidebar-footer { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  .avatar-sm { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(155deg, var(--teal-400), var(--teal-600)); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #06110F; flex-shrink: 0; }
+  .footer-name { font-size: 12.5px; font-weight: 600; color: var(--ink-900); }
+  .footer-role { font-size: 10.5px; color: var(--ink-400); }
+
+  .main { padding: 40px 48px 60px; max-width: 1360px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+  .rp-grid { display: grid; grid-template-columns: 1fr 340px; gap: 32px; align-items: start; margin-top: 32px; }
+
+  @media (max-width: 1100px) {
+    .rp-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; flex-direction: row; align-items: center; padding: 14px 16px; overflow-x: auto; }
+    .brand { border: none; padding: 0; margin: 0 16px 0 0; }
+    .nav-group-label { display: none; }
+    .sidebar-footer { display: none; }
+    .sidebar > div:not(.brand) { display: flex; gap: 4px; }
+    .main { padding: 22px 16px 50px; max-width: 100%; }
+    .scenario-grid { grid-template-columns: 1fr 1fr; }
+    .feedback-grid { grid-template-columns: 1fr; }
+    .category-grade-grid { grid-template-columns: 1fr; }
+    .call-controls { flex-direction: column; }
+    .call-btn { width: 100%; }
+  }
+  @media (max-width: 560px) {
+    .scenario-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 22px; }
+    .score-value { font-size: 42px; }
+    .call-stage { padding: 32px 18px; }
+    .call-orb { width: 88px; height: 88px; }
+  }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: var(--teal-600); margin-bottom: 10px; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: 34px; margin: 0 0 10px; letter-spacing: -0.8px; color: var(--ink-900); }
+  h1 em { font-style: italic; color: var(--teal-600); font-weight: 800; }
+  .subtitle { font-size: 14.5px; color: var(--ink-500); margin: 0 0 28px; line-height: 1.5; max-width: 680px; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 8px; }
+  .stat-card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .stat-card-value { font-family: var(--font-display); font-weight: 800; font-size: 26px; color: var(--ink-900); letter-spacing: -0.5px; }
+  .stat-card-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--ink-400); margin-top: 3px; }
+  @media (max-width: 640px) { .stat-row { grid-template-columns: 1fr 1fr; } }
+
+  .section-label { font-family: var(--font-display); font-weight: 700; font-size: 13px; margin: 32px 0 14px; color: var(--ink-700); display: flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .section-label::before { content: ''; width: 18px; height: 2px; background: linear-gradient(90deg, var(--teal-500), var(--teal-700)); border-radius: 2px; }
+
+  /* Compact sidebar history — replaces the old full-width bottom-of-page list */
+  .rp-sidebar { position: sticky; top: 24px; }
+  .rp-sidebar-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 18px 18px 8px; margin-bottom: 16px; }
+  .rp-sidebar-card h4 { font-family: var(--font-display); font-weight: 700; font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-700); }
+  .rp-sidebar-scroll { max-height: 420px; overflow-y: auto; margin: 0 -18px; padding: 0 18px; }
+  .scenario-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .scenario-card { background: var(--white); border: 1.5px solid var(--line); border-radius: 14px; padding: 18px; cursor: pointer; transition: all 0.18s ease; box-shadow: 0 1px 2px rgba(14,16,24,0.03); }
+  .scenario-card:hover { border-color: var(--teal-400); transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(14,16,24,0.15); }
+  .scenario-card.selected { border-color: var(--teal-600); background: linear-gradient(160deg, var(--teal-100), var(--white)); box-shadow: 0 0 0 3px rgba(20,184,166,0.15), 0 10px 24px -12px rgba(13,148,136,0.3); }
+  .scenario-icon { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(155deg, var(--teal-400), var(--teal-700)); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #fff; }
+  .scenario-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; letter-spacing: -0.1px; }
+  .scenario-desc { font-size: 11.5px; color: var(--ink-500); line-height: 1.45; }
+
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { padding: 9px 17px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--white); font-size: 12.5px; font-weight: 600; color: var(--ink-500); cursor: pointer; transition: all 0.15s ease; }
+  .pill:hover { border-color: var(--teal-400); transform: translateY(-1px); }
+  .pill:hover { border-color: var(--teal-400); }
+  .pill.selected { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); border-color: transparent; color: #fff; }
+
+  .segmented-control { display: flex; background: var(--white); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+  .segment { flex: 1; text-align: center; padding: 11px 10px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-500); cursor: pointer; transition: all 0.15s ease; }
+  .segment.selected { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff; box-shadow: 0 4px 12px -4px rgba(13,148,136,0.5); }
+
+  .trust-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+  .trust-badge { display: flex; align-items: center; gap: 6px; background: var(--teal-100); color: var(--teal-700); font-size: 11.5px; font-weight: 700; padding: 6px 13px; border-radius: 999px; }
+
+  .start-btn { margin-top: 30px; width: 100%; padding: 17px; border: none; border-radius: 14px; background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff; font-weight: 700; font-size: 15.5px; letter-spacing: -0.1px; box-shadow: 0 16px 34px -12px rgba(13,148,136,0.65), inset 0 1px 0 rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .start-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 20px 40px -12px rgba(13,148,136,0.75), inset 0 1px 0 rgba(255,255,255,0.15); }
+  .start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .browser-note { font-size: 11.5px; color: var(--ink-400); text-align: center; margin-top: 10px; }
+
+  .call-stage { background: radial-gradient(circle at 80% -10%, rgba(45,212,191,0.4), transparent 55%), radial-gradient(circle at 10% 110%, rgba(45,212,191,0.15), transparent 50%), linear-gradient(150deg, var(--slate-900), var(--slate-950)); border-radius: 20px; padding: 44px 30px; text-align: center; margin-bottom: 16px; box-shadow: 0 24px 50px -20px rgba(14,16,24,0.5), inset 0 1px 0 rgba(255,255,255,0.06); }
+  .call-orb { width: 108px; height: 108px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; background: linear-gradient(155deg, var(--teal-400), var(--teal-700)); transition: box-shadow 0.3s ease; box-shadow: 0 0 0 6px rgba(255,255,255,0.06), 0 20px 40px -10px rgba(13,148,136,0.6); }
+  .call-orb.listening { animation: pulseRing 1.4s infinite; }
+  .call-orb.speaking { animation: pulseRing 0.7s infinite; }
+  @keyframes pulseRing { 0% { box-shadow: 0 0 0 6px rgba(255,255,255,0.06), 0 0 0 6px rgba(45,212,191,0.55); } 70% { box-shadow: 0 0 0 6px rgba(255,255,255,0.06), 0 0 0 28px rgba(45,212,191,0); } 100% { box-shadow: 0 0 0 6px rgba(255,255,255,0.06), 0 0 0 6px rgba(45,212,191,0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .call-status { color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .call-timer { color: rgba(255,255,255,0.5); font-family: var(--font-mono); font-size: 13px; margin-bottom: 20px; }
+  .call-controls { display: flex; gap: 12px; justify-content: center; }
+  .call-btn { padding: 11px 22px; border-radius: 999px; border: none; font-weight: 700; font-size: 13px; }
+  .call-btn.end { background: var(--rose-600); color: #fff; }
+  .call-btn.mute { background: rgba(255,255,255,0.12); color: #fff; }
+  .call-btn.mute.active { background: var(--teal-500); }
+
+  .coaching-focus-card { display: flex; align-items: center; gap: 12px; background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; }
+  .coaching-focus-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--teal-100); color: var(--teal-700); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .coaching-focus-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--ink-400); }
+  .coaching-focus-text { font-size: 13px; font-weight: 600; color: var(--ink-900); }
+
+  .transcript-panel { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 18px 20px; max-height: 340px; overflow-y: auto; }
+  .transcript-line { display: flex; gap: 10px; margin-bottom: 16px; font-size: 13.5px; line-height: 1.5; }
+  .transcript-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 10px; color: #fff; margin-top: 2px; }
+  .transcript-line.advisor .transcript-avatar { background: linear-gradient(155deg, var(--teal-400), var(--teal-700)); }
+  .transcript-line.prospect .transcript-avatar { background: linear-gradient(155deg, var(--amber-600), #8a5a1a); }
+  .transcript-speaker { font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .transcript-line.advisor .transcript-speaker { color: var(--teal-700); }
+  .transcript-line.prospect .transcript-speaker { color: var(--amber-600); }
+
+  .score-hero { background: radial-gradient(circle at 80% -10%, rgba(45,212,191,0.4), transparent 55%), radial-gradient(circle at 10% 110%, rgba(45,212,191,0.15), transparent 50%), linear-gradient(150deg, var(--slate-900), var(--slate-950)); border-radius: 20px; padding: 42px 30px; text-align: center; margin-bottom: 22px; box-shadow: 0 24px 50px -20px rgba(14,16,24,0.5), inset 0 1px 0 rgba(255,255,255,0.06); }
+  .score-ring { width: 156px; height: 156px; margin: 0 auto 16px; position: relative; }
+  .score-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .score-ring-value { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 42px; color: #fff; }
+  .score-reaction { font-family: var(--font-display); font-weight: 800; font-size: 22px; color: #fff; letter-spacing: -0.4px; }
+  .score-label { color: var(--teal-400); font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin-top: 8px; }
+
+  .highlight-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .highlight-card { border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-card); }
+  .highlight-card.win { background: linear-gradient(155deg, var(--teal-100), #FFFFFF); border: 1px solid rgba(13,148,136,0.25); }
+  .highlight-card.growth { background: linear-gradient(155deg, var(--amber-100), #FFFFFF); border: 1px solid rgba(192,138,46,0.25); }
+  .highlight-icon { font-size: 22px; margin-bottom: 6px; }
+  .highlight-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--ink-500); margin-bottom: 4px; }
+  .highlight-text { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--ink-900); }
+
+  .category-grade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .grade-chip { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px 14px; box-shadow: var(--shadow-card); cursor: pointer; transition: box-shadow 0.15s ease; }
+  .grade-chip:hover { box-shadow: 0 4px 16px -6px rgba(14,16,24,0.2); }
+  .grade-chip-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .grade-chip-name { font-size: 11.5px; font-weight: 700; color: var(--ink-700); }
+  .grade-chip-letter { font-family: var(--font-display); font-weight: 800; font-size: 18px; }
+  .grade-chip-letter.A { color: var(--teal-700); }
+  .grade-chip-letter.B { color: var(--amber-600); }
+  .grade-chip-letter.C, .grade-chip-letter.D { color: var(--rose-600); }
+  .grade-chip-note { font-size: 11px; color: var(--ink-500); line-height: 1.4; display: none; margin-top: 6px; }
+  .grade-chip.expanded .grade-chip-note { display: block; }
+  .grade-chip-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 6px; }
+  .grade-chip-bar-fill { height: 100%; border-radius: 2px; }
+
+  .feedback-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .feedback-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 18px 20px; }
+  .feedback-card h4 { font-family: var(--font-display); font-size: 13.5px; margin: 0 0 10px; }
+  .feedback-card.strengths h4 { color: var(--teal-700); }
+  .feedback-card.improvements h4 { color: var(--rose-600); }
+  .feedback-card ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--ink-700); }
+
+  .category-notes { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 24px; }
+  .category-note-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .category-note-row:last-child { border-bottom: none; }
+  .category-note-label { font-weight: 700; font-size: 12.5px; margin-bottom: 3px; }
+  .category-note-text { font-size: 12px; color: var(--ink-500); line-height: 1.5; }
+
+  .action-row { display: flex; gap: 12px; }
+  .action-btn { flex: 1; padding: 13px; border-radius: var(--radius-sm); font-weight: 700; font-size: 13.5px; text-align: center; }
+  .action-btn.primary { background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff; border: none; }
+  .action-btn.secondary { background: var(--white); border: 1px solid var(--line); color: var(--ink-700); }
+
+  .history-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .history-row:last-child { border-bottom: none; }
+  .history-score { font-family: var(--font-mono); font-weight: 700; }
+
+  .voice-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .voice-row:last-child { border-bottom: none; }
+  .voice-radio { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--teal-600); }
+  .voice-info { flex: 1; cursor: pointer; }
+  .voice-name { font-weight: 700; font-size: 13px; }
+  .voice-desc { font-size: 11.5px; color: var(--ink-500); line-height: 1.4; margin-top: 1px; }
+  .voice-preview-btn { background: var(--teal-100); border: none; color: var(--teal-700); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .voice-preview-btn:hover { background: var(--teal-500); color: #fff; }
+
+  [data-view] { display: none; }
+  [data-view].active { display: block; }
+</style>
+</head>
+<body>
+
+<div id="viewAsBanner" style="display:none;position:sticky;top:0;z-index:200;background:linear-gradient(90deg,#1A1B2E,#0E1018);color:#fff;padding:10px 24px;font-size:12.5px;font-weight:600;display:none;align-items:center;justify-content:center;gap:10px;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14" style="color:#2DD4BF;"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+  <span>Viewing as <strong id="viewAsName">—</strong> — this is exactly what they see.</span>
+  <button id="exitViewAsBtn" style="background:rgba(255,255,255,0.12);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;margin-left:6px;">Exit Preview</button>
+</div>
+
+<script>
+(function() {
+  // Real fix — the "view as" shim must run before ANY other script on
+  // the page reads the advisor ID, so it patches localStorage.getItem
+  // itself rather than requiring every page's fetch logic to be touched
+  // individually.
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  if (viewingAsId) {
+    var originalGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === 'grwth_advisor_id') return viewingAsId;
+      return originalGetItem.call(this, key);
+    };
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  var apiBase = window.GRWTH_API_BASE || Storage.prototype.getItem.call(localStorage, 'grwth_api_base') || 'https://api.grwthtech.com';
+  var realAdvisorId = Storage.prototype.getItem.call(localStorage, 'grwth_advisor_id');
+  var viewingAsId = sessionStorage.getItem('grwth_viewing_as_id');
+  var viewingAsName = sessionStorage.getItem('grwth_viewing_as_name');
+
+  if (viewingAsId && viewingAsName) {
+    document.getElementById('viewAsName').textContent = viewingAsName;
+    document.getElementById('viewAsBanner').style.display = 'flex';
+  }
+
+  document.getElementById('exitViewAsBtn').addEventListener('click', function() {
+    sessionStorage.removeItem('grwth_viewing_as_id');
+    sessionStorage.removeItem('grwth_viewing_as_name');
+    window.location.reload();
+  });
+
+  // Real fix — the "View As" button itself now lives only on
+  // Settings, per Logan's requirement. The shim above and this banner
+  // still apply on every page so browsing the rest of the app while
+  // viewing as someone else keeps working correctly.
+});
+</script>
+
+
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="grwth-icon.png" alt="GRWTH Coach" class="brand-mark" style="object-fit:cover;">
+      <div>
+        <div class="brand-name">GRWTH Coach</div>
+        <div class="brand-sub">Coach IQ Engine</div>
+      </div>
+    </div>
+
+    <div class="org-card">
+      <div class="org-card-label">Organization</div>
+      <div class="org-card-name" id="sidebarOrgName">Loading…</div>
+      <span class="org-badge" id="sidebarOrgBadge">—</span>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Overview</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a href="meetings.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="14" height="16" rx="2"/><path d="M17 9l4-2v10l-4-2"/></svg>
+        Meetings
+      </a>
+      <a href="coaching-reports.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+        Coaching Reports
+      </a>
+      <a href="analytics.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.1-4-4L3 15.5"/></svg>
+        Analytics
+      </a>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Team</div>
+      <a href="team-performance.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team Performance
+      </a>
+      <a href="training-library.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V6a2 2 0 0 1 2-2h9l5 5v10.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M8 12h8M8 16h5"/></svg>
+        Training Library
+      </a>
+      <a href="natural-selling-vault.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+        Natural Selling Vault
+      </a>
+      <a href="roleplay.html" class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+        Role-Play
+      </a>
+    </div>
+
+    <div>
+      <div class="nav-group-label">Account</div>
+      <a href="settings.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </a>
+      <a href="ask-grwth.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        Ask GRWTH
+      </a>
+    </div>
+
+    <div id="superAdminNavGroup" style="display:none;">
+      <div class="nav-group-label">System</div>
+      <a href="super-admin.html" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/></svg>
+        Super Admin
+      </a>
+    </div>
+
+<script>
+(function() {
+  var apiBase = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+  var advisorId = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+  if (!advisorId) return;
+  fetch(apiBase + '/api/grwth-coach/me', { credentials: 'include', headers: { 'x-advisor-id': advisorId } })
+    .then(function(r) { return r.json(); })
+    .then(function(me) {
+      if (me.superAdmin) {
+        var el = document.getElementById('superAdminNavGroup');
+        if (el) el.style.display = 'block';
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+
+    <div class="sidebar-footer">
+      <div class="avatar-sm" id="sidebarAvatar">LK</div>
+      <div>
+        <div class="footer-name" id="sidebarFooterName">Logan Knecht</div>
+        <div class="footer-role" id="sidebarFooterRole">Agency Owner</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="eyebrow">Coach IQ · Practice</div>
+    <h1>Practice until it's <em>second nature.</em></h1>
+    <p class="subtitle">A live simulated prospect that talks back, pushes back, and grades you like a real coach would — before you're ever on the clock with a real one.</p>
+
+    <div class="trust-row">
+      <div class="trust-badge">✓ Real Voice, Real Objections</div>
+      <div class="trust-badge">✓ Graded on 8 Skills</div>
+      <div class="trust-badge">✓ Practice Anytime</div>
+    </div>
+
+    <div class="rp-type-tabs" style="display:flex;gap:6px;background:var(--bg,#F4F5F7);border-radius:999px;padding:4px;width:fit-content;margin:0 0 20px;">
+      <button class="rp-type-tab active" data-type="sales" style="border:none;background:#fff;color:#0E1018;font-size:12.5px;font-weight:700;padding:7px 16px;border-radius:999px;cursor:pointer;box-shadow:0 1px 3px rgba(14,16,24,0.08);">Client</button>
+      <button class="rp-type-tab" data-type="recruiting" style="border:none;background:transparent;color:#6B7280;font-size:12.5px;font-weight:700;padding:7px 16px;border-radius:999px;cursor:pointer;">Recruiting</button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-card-value">5</div><div class="stat-card-label">Scenarios</div></div>
+      <div class="stat-card"><div class="stat-card-value">3</div><div class="stat-card-label">Call Types</div></div>
+      <div class="stat-card"><div class="stat-card-value">18</div><div class="stat-card-label">Voices</div></div>
+      <div class="stat-card"><div class="stat-card-value">24/7</div><div class="stat-card-label">AI Coach</div></div>
+    </div>
+
+    <div data-view="setup" class="active">
+      <div class="rp-grid">
+        <div class="rp-main-col">
+          <div id="personalizedScenarioBanner" style="background:linear-gradient(155deg,var(--slate-900) 0%,#1A1B2E 60%,var(--slate-900) 100%);border-radius:16px;padding:22px 24px;margin-bottom:20px;position:relative;overflow:hidden;box-shadow:0 20px 40px -18px rgba(14,16,24,0.35);">
+            <div style="position:absolute;top:-40%;right:-8%;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(45,212,191,0.16),transparent 70%);pointer-events:none;"></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--teal-400);margin-bottom:10px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="14" height="14"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+              Built from your real calls
+            </div>
+            <div id="personalizedScenarioContent">
+              <div style="font-family:var(--font-display);font-weight:700;font-size:17px;color:#fff;margin-bottom:6px;">Practice your own biggest gap</div>
+              <div style="font-size:12.5px;color:rgba(255,255,255,0.65);line-height:1.5;margin-bottom:16px;max-width:420px;">Your coach picks the sub-skill you actually need work on and builds a scenario from a real moment in your own calls.</div>
+              <button id="generatePersonalizedBtn" style="background:linear-gradient(135deg,var(--teal-400),var(--teal-600));color:#06110F;border:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:12.5px;">Generate My Scenario</button>
+            </div>
+          </div>
+
+          <div class="section-label">1. What are you practicing?</div>
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button class="practice-type-tab active" data-practice-type="client" style="flex:1;background:var(--teal-100);color:var(--teal-700);border:1.5px solid var(--teal-500);padding:12px;border-radius:12px;font-weight:700;font-size:13px;">Client Calls</button>
+            <button class="practice-type-tab" data-practice-type="recruiting" style="flex:1;background:var(--white);color:var(--ink-500);border:1.5px solid var(--line);padding:12px;border-radius:12px;font-weight:700;font-size:13px;">Recruiting</button>
+          </div>
+
+          <div class="section-label">2. Choose a scenario</div>
+          <div class="scenario-grid" id="scenarioGrid"></div>
+
+          <div class="section-label">2. Call focus</div>
+          <div class="segmented-control" id="callTypeRow"></div>
+
+          <div class="section-label">3. Difficulty</div>
+          <div class="pill-row" id="difficultyRow"></div>
+
+          <div class="section-label">4. Prospect personality</div>
+          <div class="pill-row" id="personalityRow"></div>
+
+          <div class="section-label">5. Prospect voice</div>
+          <div id="voicePickerList" style="background:var(--white);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:8px 20px;max-height:340px;overflow-y:auto;">
+            <p style="font-size:12.5px;color:var(--ink-400);padding:14px 0;">Loading voices…</p>
+          </div>
+
+          <button class="start-btn" id="startBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+            Start Practice Call
+          </button>
+          <div class="browser-note" id="browserNote"></div>
+        </div>
+
+        <div class="rp-sidebar">
+          <div class="rp-sidebar-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <h4 style="margin:0;">Recent Sessions</h4>
+              <button id="bulkDeleteBtn" style="display:none;background:var(--rose-600);color:#fff;border:none;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;cursor:pointer;">Delete</button>
+            </div>
+            <div class="rp-sidebar-scroll" id="historyList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div data-view="call">
+      <div class="call-stage" id="callStage">
+        <div style="margin-bottom:18px;">
+          <div style="font-family:var(--font-display);font-weight:700;font-size:18px;color:#fff;" id="callProspectName">—</div>
+          <div style="font-size:12px;color:var(--teal-400);text-transform:uppercase;letter-spacing:0.6px;font-weight:700;margin-top:3px;" id="callScenarioLabel">—</div>
+        </div>
+        <div class="call-orb" id="callOrb">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="36" height="36"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+        </div>
+        <div class="call-status" id="callStatus">Connecting…</div>
+        <div id="voiceWarningBanner" style="display:none;background:rgba(213,73,58,0.15);border:1px solid rgba(213,73,58,0.4);color:#ffb4a8;font-size:11.5px;font-weight:600;padding:8px 14px;border-radius:8px;margin-bottom:12px;max-width:420px;margin-left:auto;margin-right:auto;"></div>
+        <div class="call-timer" id="callTimer">0:00</div>
+        <div class="call-controls">
+          <button class="call-btn mute" id="muteBtn">Mute</button>
+          <button class="call-btn end" id="endCallBtn">End Call</button>
+        </div>
+      </div>
+
+      <div class="coaching-focus-card" id="coachingFocusCard">
+        <div class="coaching-focus-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <div>
+          <div class="coaching-focus-label">What's being graded right now</div>
+          <div class="coaching-focus-text" id="coachingFocusText">Foundations, tone, and discovery questions</div>
+        </div>
+      </div>
+
+      <div class="transcript-panel" id="transcriptPanel"></div>
+    </div>
+
+    <div id="scoringOverlay" style="display:none;position:fixed;inset:0;background:rgba(14,16,24,0.85);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:18px;">
+      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(155deg, var(--teal-400), var(--teal-700));display:flex;align-items:center;justify-content:center;animation:pulseRing 1.3s infinite;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="26" height="26"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+      </div>
+      <div style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:16px;">Scoring your call&hellip;</div>
+      <div style="color:rgba(255,255,255,0.55);font-size:12.5px;">Reviewing what worked and what to focus on next</div>
+    </div>
+
+    <div data-view="scorecard">
+      <div class="score-hero">
+        <div class="score-ring" id="scoreRing"></div>
+        <div class="score-reaction" id="scoreReaction">Nice Work</div>
+        <div class="score-label">Coach IQ · This Session</div>
+      </div>
+
+      <div class="highlight-row">
+        <div class="highlight-card win">
+          <div class="highlight-icon">🏆</div>
+          <div class="highlight-label">Your Top Win</div>
+          <div class="highlight-text" id="topWinText">—</div>
+        </div>
+        <div class="highlight-card growth">
+          <div class="highlight-icon">🎯</div>
+          <div class="highlight-label">Biggest Opportunity</div>
+          <div class="highlight-text" id="topGrowthText">—</div>
+        </div>
+      </div>
+
+      <div class="feedback-grid">
+        <div class="feedback-card strengths">
+          <h4>✅ What Worked</h4>
+          <ul id="strengthsList"></ul>
+        </div>
+        <div class="feedback-card improvements">
+          <h4>🔧 Focus Next Time</h4>
+          <ul id="improvementsList"></ul>
+        </div>
+      </div>
+
+      <div class="section-label">Skill Breakdown</div>
+      <div class="category-grade-grid" id="categoryGradeGrid"></div>
+
+      <div class="action-row">
+        <button class="action-btn secondary" id="practiceAgainBtn">Practice Again</button>
+        <a href="coaching-reports.html" class="action-btn primary">View Coaching Reports</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
+const ADVISOR_ID = window.GRWTH_ADVISOR_ID || localStorage.getItem('grwth_advisor_id') || '';
+
+async function fetchJSON(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include', ...options, headers: { 'x-advisor-id': ADVISOR_ID, ...(options.headers || {}) } });
+  if (!res.ok) {
+    let message = `API ${res.status} on ${path}`;
+    try { const body = await res.json(); if (body && body.error) message = body.error; } catch (_) {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+(function () {
+  const name = localStorage.getItem('grwth_advisor_name');
+  const role = localStorage.getItem('grwth_advisor_role');
+  const nameEl = document.getElementById('sidebarFooterName');
+  const roleEl = document.getElementById('sidebarFooterRole');
+  const avatarEl = document.getElementById('sidebarAvatar');
+  const roleLabelText = role === 'agency_owner' ? 'Agency Owner' : role === 'admin' ? 'Admin' : 'Agent';
+  if (name && nameEl) nameEl.textContent = name;
+  if (role && roleEl) roleEl.textContent = roleLabelText;
+  if (name && avatarEl) avatarEl.textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map(function(w){return w[0];}).join('').toUpperCase();
+    var cachedPhoto = localStorage.getItem('grwth_advisor_photo');
+    if (cachedPhoto && avatarEl) {
+      avatarEl.style.backgroundImage = 'url(' + cachedPhoto + ')';
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.textContent = '';
+    }
+
+  const orgNameEl = document.getElementById('sidebarOrgName');
+  const orgBadgeEl = document.getElementById('sidebarOrgBadge');
+  if (orgBadgeEl) orgBadgeEl.textContent = roleLabelText;
+  if (orgNameEl) orgNameEl.textContent = 'GRWTH TECH';
+  if (ADVISOR_ID && orgNameEl) {
+    fetch(API_BASE + '/api/grwth-coach/me', { credentials: 'include', headers: { 'x-advisor-id': ADVISOR_ID } })
+      .then(function(r) { return r.json(); })
+      .then(function(me) {
+        orgNameEl.textContent = me.teamName || 'GRWTH TECH';
+        if (me.photoUrl && avatarEl) {
+          avatarEl.style.backgroundImage = 'url(' + me.photoUrl + ')';
+          avatarEl.style.backgroundSize = 'cover';
+          avatarEl.style.backgroundPosition = 'center';
+          avatarEl.textContent = '';
+          localStorage.setItem('grwth_advisor_photo', me.photoUrl);
+        } else if (avatarEl) {
+          avatarEl.style.backgroundImage = '';
+          localStorage.removeItem('grwth_advisor_photo');
+        }
+        if (orgBadgeEl && me.roleLabel) orgBadgeEl.textContent = me.roleLabel;
+      })
+      .catch(function() {});
+  }
+
+  const footer = document.querySelector('.sidebar-footer');
+  if (footer) {
+    const logoutBtn = document.createElement('button');
+    logoutBtn.textContent = 'Log Out';
+    logoutBtn.style.cssText = 'background:none;border:none;color:var(--ink-500);font-size:11px;font-weight:600;cursor:pointer;padding:4px 8px;font-family:inherit;';
+    const themeBtn = document.createElement('button');
+    themeBtn.id = 'themeToggleBtn';
+    themeBtn.title = 'Toggle dark mode';
+    themeBtn.style.cssText = 'margin-left:auto;border:1px solid var(--line);background:var(--bg);color:var(--ink-700);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;';
+    themeBtn.innerHTML =
+      '<svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' +
+      '<svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="display:none;"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>';
+    function applyThemeIcon() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.getElementById('themeIconSun').style.display = isDark ? 'none' : 'block';
+      document.getElementById('themeIconMoon').style.display = isDark ? 'block' : 'none';
+    }
+    themeBtn.addEventListener('click', function() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('grwth_theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('grwth_theme', 'dark');
+      }
+      applyThemeIcon();
+    });
+    logoutBtn.addEventListener('click', async function () {
+      try {
+        await fetch(`${API_BASE}/api/grwth-coach/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (err) {
+        console.warn('[GRWTH Coach] Logout request failed:', err.message);
+      }
+      localStorage.removeItem('grwth_advisor_id');
+      localStorage.removeItem('grwth_advisor_name');
+      localStorage.removeItem('grwth_advisor_email');
+      localStorage.removeItem('grwth_advisor_role');
+      window.location.href = 'login.html';
+    });
+    footer.style.display = 'flex';
+    footer.style.alignItems = 'center';
+    footer.appendChild(themeBtn);
+    footer.appendChild(logoutBtn);
+    applyThemeIcon();
+  }
+})();
+
+const SCENARIOS = [
+  { id: 'life_insurance', title: 'Life Insurance', desc: 'New lead, some awareness they need coverage.', icon: '<path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4Z"/>' },
+  { id: 'iul', title: 'IUL', desc: 'High-net-worth, financially literate, skeptical.', icon: '<path d="M3 3v18h18"/><path d="M18.7 8 13.6 13.1l-4-4L3 15.5"/>' },
+  { id: 'annuity_retirement', title: 'Annuity / Retirement', desc: 'Pre-retiree worried about market risk.', icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>' },
+  { id: 'final_expense', title: 'Final Expense', desc: 'Older, fixed income, price-sensitive.', icon: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.6Z"/>' },
+  { id: 'recruiting', title: 'Recruiting', desc: 'Candidate wary of licensing & commission risk.', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
+];
+const CALL_TYPES = [
+  { id: 'discovery', label: 'Discovery Call' },
+  { id: 'objection_handling', label: 'Objection Handling' },
+  { id: 'closing', label: 'Closing Call' },
+];
+const DIFFICULTIES = [
+  { id: 'beginner', label: 'Beginner' },
+  { id: 'intermediate', label: 'Intermediate' },
+  { id: 'advanced', label: 'Advanced' },
+  { id: 'elite', label: 'Elite' },
+];
+const PERSONALITIES = [
+  { id: 'friendly', label: 'Friendly' },
+  { id: 'skeptical', label: 'Skeptical' },
+  { id: 'analytical', label: 'Analytical' },
+  { id: 'distracted', label: 'Distracted' },
+  { id: 'price_sensitive', label: 'Price-Sensitive' },
+];
+
+let selectedScenario = 'life_insurance';
+let selectedCallType = 'discovery';
+let selectedDifficulty = 'intermediate';
+let selectedPersonality = 'friendly';
+let selectedVoiceId = null; // set once real voices load; null means "let the backend auto-pick"
+let availableVoices = [];
+let activePracticeType = 'client';
+
+function renderSetupOptions() {
+  const visibleScenarios = SCENARIOS.filter(function(s) {
+    return activePracticeType === 'recruiting' ? s.id === 'recruiting' : s.id !== 'recruiting';
+  });
+  document.getElementById('scenarioGrid').innerHTML = visibleScenarios.map(function(s) {
+    return '<div class="scenario-card ' + (s.id === selectedScenario ? 'selected' : '') + '" data-scenario="' + s.id + '">' +
+      '<div class="scenario-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">' + s.icon + '</svg></div>' +
+      '<div class="scenario-title">' + s.title + '</div>' +
+      '<div class="scenario-desc">' + s.desc + '</div></div>';
+  }).join('');
+  document.querySelectorAll('.scenario-card').forEach(function(el) {
+    el.addEventListener('click', function () { selectedScenario = el.dataset.scenario; renderSetupOptions(); });
+  });
+
+  document.getElementById('callTypeRow').innerHTML = CALL_TYPES.map(function(c) {
+    return '<div class="segment ' + (c.id === selectedCallType ? 'selected' : '') + '" data-calltype="' + c.id + '">' + c.label + '</div>';
+  }).join('');
+  document.querySelectorAll('[data-calltype]').forEach(function(el) {
+    el.addEventListener('click', function () { selectedCallType = el.dataset.calltype; renderSetupOptions(); });
+  });
+
+  document.getElementById('difficultyRow').innerHTML = DIFFICULTIES.map(function(d) {
+    return '<button class="pill ' + (d.id === selectedDifficulty ? 'selected' : '') + '" data-difficulty="' + d.id + '">' + d.label + '</button>';
+  }).join('');
+  document.querySelectorAll('[data-difficulty]').forEach(function(el) {
+    el.addEventListener('click', function () { selectedDifficulty = el.dataset.difficulty; renderSetupOptions(); });
+  });
+
+  document.getElementById('personalityRow').innerHTML = PERSONALITIES.map(function(p) {
+    return '<button class="pill ' + (p.id === selectedPersonality ? 'selected' : '') + '" data-personality="' + p.id + '">' + p.label + '</button>';
+  }).join('');
+  document.querySelectorAll('[data-personality]').forEach(function(el) {
+    el.addEventListener('click', function () { selectedPersonality = el.dataset.personality; renderSetupOptions(); });
+  });
+}
+
+document.querySelectorAll('.practice-type-tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    activePracticeType = btn.dataset.practiceType;
+    document.querySelectorAll('.practice-type-tab').forEach(function(b) {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.style.background = isActive ? 'var(--teal-100)' : 'var(--white)';
+      b.style.color = isActive ? 'var(--teal-700)' : 'var(--ink-500)';
+      b.style.borderColor = isActive ? 'var(--teal-500)' : 'var(--line)';
+    });
+    selectedScenario = activePracticeType === 'recruiting' ? 'recruiting' : 'life_insurance';
+    renderSetupOptions();
+  });
+});
+
+renderSetupOptions();
+
+/* ---------------------------------------------------------------------
+   Voice picker — real voices fetched from Inworld, with a preview button
+   so the advisor can actually LISTEN and pick, rather than trust a
+   guess about which names sound American vs British.
+--------------------------------------------------------------------- */
+async function loadVoices() {
+  if (!ADVISOR_ID) return;
+  try {
+    availableVoices = await fetchJSON('/api/grwth-coach/roleplay/voices');
+    renderVoicePicker();
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load voice list:', err.message);
+    document.getElementById('voicePickerList').innerHTML =
+      '<p style="font-size:12.5px;color:var(--rose-600);padding:14px 0;">Could not load voices — using automatic voice selection instead.</p>';
+  }
+}
+
+let selectedVoiceGender = 'female';
+
+function renderVoicePicker() {
+  const list = document.getElementById('voicePickerList');
+  if (availableVoices.length === 0) {
+    list.innerHTML = '<p style="font-size:12.5px;color:var(--ink-400);padding:14px 0;">No voices available — using the browser\'s built-in voice instead.</p>';
+    return;
+  }
+
+  const filtered = availableVoices.filter(function(v) { return v.gender === selectedVoiceGender; });
+  if (!selectedVoiceId || !filtered.some(function(v) { return v.id === selectedVoiceId; })) {
+    selectedVoiceId = filtered.length > 0 ? filtered[0].id : null;
+  }
+
+  const toggleHtml = '<div style="display:flex;gap:8px;padding:12px 0 4px;">' +
+    '<button class="pill ' + (selectedVoiceGender === 'female' ? 'selected' : '') + '" data-gender="female" style="flex:1;">Female</button>' +
+    '<button class="pill ' + (selectedVoiceGender === 'male' ? 'selected' : '') + '" data-gender="male" style="flex:1;">Male</button>' +
+  '</div>';
+
+  const rowsHtml = filtered.map(function(v) {
+    return '<div class="voice-row">' +
+      '<input type="radio" class="voice-radio" name="voicePick" data-voice-radio="' + v.id + '" ' + (v.id === selectedVoiceId ? 'checked' : '') + '>' +
+      '<div class="voice-info" data-voice-info="' + v.id + '">' +
+        '<div class="voice-name">' + v.name + '</div>' +
+        '<div class="voice-desc">' + (v.description || 'No description available') + '</div>' +
+      '</div>' +
+      '<button class="voice-preview-btn" data-voice-preview="' + v.id + '" title="Preview this voice">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg>' +
+      '</button>' +
+    '</div>';
+  }).join('');
+
+  list.innerHTML = toggleHtml + rowsHtml;
+
+  list.querySelectorAll('[data-gender]').forEach(function(el) {
+    el.addEventListener('click', function () { selectedVoiceGender = el.dataset.gender; renderVoicePicker(); });
+  });
+  list.querySelectorAll('[data-voice-radio]').forEach(function(el) {
+    el.addEventListener('change', function () { selectedVoiceId = el.dataset.voiceRadio; });
+  });
+  list.querySelectorAll('[data-voice-info]').forEach(function(el) {
+    el.addEventListener('click', function () {
+      selectedVoiceId = el.dataset.voiceInfo;
+      renderVoicePicker();
+    });
+  });
+  list.querySelectorAll('[data-voice-preview]').forEach(function(el) {
+    el.addEventListener('click', async function (e) {
+      e.stopPropagation();
+      el.disabled = true;
+      try {
+        const result = await fetchJSON('/api/grwth-coach/roleplay/preview-voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voiceId: el.dataset.voicePreview }),
+        });
+        if (result.audioBase64) {
+          const audio = new Audio('data:audio/mp3;base64,' + result.audioBase64);
+          audio.play();
+        }
+      } catch (err) {
+        console.warn('[GRWTH Coach] Voice preview failed:', err.message);
+      } finally {
+        el.disabled = false;
+      }
+    });
+  });
+}
+loadVoices();
+loadPersonalizedScenarios();
+
+function showView(name) {
+  document.querySelectorAll('[data-view]').forEach(function(v) { v.classList.toggle('active', v.dataset.view === name); });
+}
+
+async function loadHistory() {
+  if (!ADVISOR_ID) return;
+  try {
+    const sessions = await fetchJSON('/api/grwth-coach/roleplay/history');
+    const list = document.getElementById('historyList');
+    document.getElementById('bulkDeleteBtn').style.display = 'none';
+    if (sessions.length === 0) {
+      list.innerHTML = '<p style="font-size:12.5px;color:var(--ink-400);padding:14px 0;">No practice sessions yet — start one above.</p>';
+      return;
+    }
+    list.innerHTML = sessions.map(function(s) {
+      const color = s.score >= 85 ? 'var(--teal-700)' : s.score >= 70 ? 'var(--amber-600)' : 'var(--rose-600)';
+      return '<div class="history-row" data-history-id="' + s.id + '" style="cursor:pointer;">' +
+        '<input type="checkbox" class="history-select" data-select-history="' + s.id + '" style="margin-right:10px;width:15px;height:15px;accent-color:var(--teal-600);" onclick="event.stopPropagation();">' +
+        '<div style="flex:1;"><div style="font-weight:600;">' + s.scenarioLabel + '</div>' +
+        '<div style="font-size:11px;color:var(--ink-400);text-transform:capitalize;">' + (s.callType ? s.callType.replace('_', ' ') + ' · ' : '') + s.difficulty + ' · ' + s.personality.replace('_', ' ') + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<div class="history-score" style="color:' + color + '">' + (s.score !== null && s.score !== undefined ? s.score : '—') + '</div>' +
+        '<button data-delete-history="' + s.id + '" style="background:none;border:none;color:var(--ink-400);padding:4px;" title="Delete this session">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/></svg>' +
+        '</button></div></div>';
+    }).join('');
+
+    function updateBulkDeleteVisibility() {
+      const anyChecked = list.querySelectorAll('.history-select:checked').length > 0;
+      document.getElementById('bulkDeleteBtn').style.display = anyChecked ? 'inline-block' : 'none';
+    }
+    list.querySelectorAll('.history-select').forEach(function(cb) {
+      cb.addEventListener('change', updateBulkDeleteVisibility);
+    });
+
+    list.querySelectorAll('[data-history-id]').forEach(function(row) {
+      row.addEventListener('click', function (e) {
+        if (e.target.closest('[data-delete-history]') || e.target.closest('.history-select')) return;
+        viewPastSession(row.dataset.historyId);
+      });
+    });
+    list.querySelectorAll('[data-delete-history]').forEach(function(btn) {
+      btn.addEventListener('click', async function (e) {
+        e.stopPropagation();
+        if (!confirm('Delete this practice session permanently?')) return;
+        try {
+          await fetchJSON('/api/grwth-coach/roleplay/history/' + btn.dataset.deleteHistory, { method: 'DELETE' });
+          loadHistory();
+        } catch (err) {
+          alert("Couldn't delete: " + err.message);
+        }
+      });
+    });
+  } catch (err) {
+    console.warn('[GRWTH Coach] Could not load role-play history:', err.message);
+  }
+}
+loadHistory();
+
+document.getElementById('bulkDeleteBtn').addEventListener('click', async function () {
+  const ids = Array.from(document.querySelectorAll('.history-select:checked')).map(function(cb) { return cb.dataset.selectHistory; });
+  if (ids.length === 0) return;
+  if (!confirm('Delete ' + ids.length + ' practice session(s) permanently?')) return;
+
+  const btn = document.getElementById('bulkDeleteBtn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting\u2026';
+  try {
+    await Promise.all(ids.map(function(id) {
+      return fetchJSON('/api/grwth-coach/roleplay/history/' + id, { method: 'DELETE' });
+    }));
+    loadHistory();
+  } catch (err) {
+    alert("Couldn't delete some sessions: " + err.message);
+    loadHistory();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Delete Selected';
+  }
+});
+
+async function viewPastSession(sessionId) {
+  try {
+    const s = await fetchJSON('/api/grwth-coach/roleplay/history/' + sessionId);
+
+    renderScoreRing(s.score);
+    document.getElementById('scoreReaction').textContent = reactionForScore(s.score);
+    document.getElementById('topWinText').textContent = s.topWin || (s.strengths && s.strengths[0]) || 'Keep it up.';
+    document.getElementById('topGrowthText').textContent = s.topGrowth || (s.improvements && s.improvements[0]) || 'Keep practicing.';
+    document.getElementById('strengthsList').innerHTML = (s.strengths || []).map(function(x) { return '<li>' + x + '</li>'; }).join('');
+    document.getElementById('improvementsList').innerHTML = (s.improvements || []).map(function(x) { return '<li>' + x + '</li>'; }).join('');
+
+    const categoryLabels = {
+      foundations: 'Foundations', connecting_tone: 'Connecting & Tone', situation_questions: 'Situation Questions',
+      problem_awareness: 'Problem Awareness', consequence_questions: 'Consequence Questions',
+      solution_commitment: 'Solution & Commitment', objection_reframes: 'Objection Reframes', live_call_teardown: 'Live Call Teardown',
+    };
+    const notesEntries = Object.entries(s.categoryNotes || {});
+    document.getElementById('categoryGradeGrid').innerHTML = notesEntries.map(function(entry) {
+      const key = entry[0], data = entry[1] || {};
+      const letter = data.letter || '—';
+      const score = typeof data.score === 'number' ? data.score : 0;
+      const barColor = letter === 'A' ? 'var(--teal-500)' : letter === 'B' ? 'var(--amber-600)' : 'var(--rose-600)';
+      return '<div class="grade-chip" data-chip="' + key + '">' +
+        '<div class="grade-chip-top"><span class="grade-chip-name">' + (categoryLabels[key] || key) + '</span>' +
+        '<span class="grade-chip-letter ' + letter + '">' + letter + '</span></div>' +
+        '<div class="grade-chip-bar"><div class="grade-chip-bar-fill" style="width:' + score + '%;background:' + barColor + ';"></div></div>' +
+        '<div class="grade-chip-note">' + (data.note || '') + '</div>' +
+      '</div>';
+    }).join('');
+    document.querySelectorAll('.grade-chip').forEach(function(chip) {
+      chip.addEventListener('click', function () { chip.classList.toggle('expanded'); });
+    });
+
+    showView('scorecard');
+  } catch (err) {
+    alert("Couldn't load this session: " + err.message);
+  }
+}
+
+let conversationHistory = [];
+let callStartTime = null;
+let callTimerInterval = null;
+let isMuted = false;
+let callActive = false;
+
+document.getElementById('browserNote').textContent = 'Uses your microphone — works in Chrome, Firefox, Safari, and Edge.';
+
+let liveKitRoom = null;
+
+function setCallStatus(state, text) {
+  const orb = document.getElementById('callOrb');
+  orb.className = 'call-orb' + (state ? ' ' + state : '');
+  document.getElementById('callStatus').textContent = text;
+}
+
+function addTranscriptLine(role, text) {
+  const panel = document.getElementById('transcriptPanel');
+  const line = document.createElement('div');
+  line.className = 'transcript-line ' + role;
+  const initials = role === 'advisor' ? 'You' : (selectedVoiceId ? selectedVoiceId[0] : 'P');
+  line.innerHTML = '<div class="transcript-avatar">' + initials + '</div>' +
+    '<div><div class="transcript-speaker">' + (role === 'advisor' ? 'You' : 'Prospect') + '</div>' + text + '</div>';
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+/**
+ * Real-time voice call via LiveKit — replaces the old browser
+ * SpeechRecognition + REST-per-turn architecture entirely. LiveKit's
+ * agent (a separate deployed process, see /livekit-agent) handles the
+ * actual listen -> think -> speak loop, including barge-in and turn
+ * detection natively. This page's job is just: connect to the room,
+ * play whatever audio comes back, and log the transcript for scoring.
+ */
+async function startCall(personalizedScenarioId) {
+  if (!ADVISOR_ID) {
+    alert('No agent ID configured — log in first.');
+    return;
+  }
+
+  const startBtn = document.getElementById('startBtn');
+  startBtn.disabled = true;
+  setCallStatus('', 'Connecting\u2026');
+  showView('call');
+
+  const scenarioMeta = SCENARIOS.find(function(s) { return s.id === selectedScenario; });
+  const callTypeMeta = CALL_TYPES.find(function(c) { return c.id === selectedCallType; });
+  document.getElementById('callProspectName').textContent = selectedVoiceId ? 'Speaking with ' + selectedVoiceId : 'Practice Call';
+  document.getElementById('callScenarioLabel').textContent = personalizedScenarioId
+    ? 'Your Personalized Scenario'
+    : (scenarioMeta ? scenarioMeta.title : 'Practice') + ' \u00b7 ' + (callTypeMeta ? callTypeMeta.label : '');
+
+  const focusTextByType = {
+    discovery: 'Foundations, tone, and situation questions — how you open and uncover the real need',
+    objection_handling: 'Objection reframes — how you handle real pushback without sounding scripted',
+    closing: 'Solution & commitment — whether you actually secure a concrete next step',
+  };
+  document.getElementById('coachingFocusText').textContent = focusTextByType[selectedCallType] || focusTextByType.discovery;
+
+  conversationHistory = [];
+  document.getElementById('transcriptPanel').innerHTML = '';
+  callActive = true;
+  callStartTime = Date.now();
+  callTimerInterval = setInterval(updateCallTimer, 1000);
+
+  try {
+    const tokenResult = await fetchJSON('/api/grwth-coach/roleplay/livekit-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenario: selectedScenario,
+        difficulty: selectedDifficulty,
+        personality: selectedPersonality,
+        callType: selectedCallType,
+        voiceName: selectedVoiceId || 'Sarah',
+        personalizedScenarioId: personalizedScenarioId || undefined,
+      }),
+    });
+
+    liveKitRoom = new LivekitClient.Room();
+
+    liveKitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, function (track) {
+      if (track.kind === 'audio') {
+        const el = track.attach();
+        el.style.display = 'none';
+        document.body.appendChild(el);
+        setCallStatus('speaking', 'Prospect speaking\u2026');
+      }
+    });
+
+    liveKitRoom.on(LivekitClient.RoomEvent.TranscriptionReceived, function (segments, participant) {
+      segments.forEach(function (seg) {
+        if (!seg.final) return;
+        const isAdvisor = participant && participant.isLocal;
+        const role = isAdvisor ? 'advisor' : 'prospect';
+        addTranscriptLine(role, seg.text);
+        conversationHistory.push({ role: role, text: seg.text, timeSec: Math.round((Date.now() - callStartTime) / 1000) });
+        if (!isAdvisor) setCallStatus('listening', 'Listening\u2026');
+      });
+    });
+
+    liveKitRoom.on(LivekitClient.RoomEvent.Disconnected, function () {
+      if (callActive) setCallStatus('', 'Call ended unexpectedly');
+    });
+
+    liveKitRoom.on(LivekitClient.RoomEvent.ConnectionStateChanged, function (state) {
+      console.log('[GRWTH Coach] LiveKit connection state:', state);
+    });
+    liveKitRoom.on(LivekitClient.RoomEvent.ParticipantConnected, function (participant) {
+      console.log('[GRWTH Coach] Agent joined the room:', participant.identity);
+    });
+
+    await liveKitRoom.connect(tokenResult.url, tokenResult.token);
+
+    // REQUIRED by browser autoplay policy — without this, remote audio
+    // can be completely silent with zero errors thrown, because
+    // browsers block audio playback that wasn't triggered directly by a
+    // user click. startCall() is itself called from the Start Practice
+    // Call button's click handler, so this qualifies as direct user
+    // interaction and satisfies that requirement.
+    try {
+      await liveKitRoom.startAudio();
+    } catch (audioErr) {
+      console.warn('[GRWTH Coach] startAudio failed, will retry on AudioPlaybackStatusChanged:', audioErr);
+    }
+    liveKitRoom.on(LivekitClient.RoomEvent.AudioPlaybackStatusChanged, function () {
+      if (!liveKitRoom.canPlaybackAudio) {
+        console.warn('[GRWTH Coach] Audio playback blocked by browser — will retry on next click');
+      }
+    });
+    await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
+    setCallStatus('listening', 'Listening\u2026');
+  } catch (err) {
+    console.error('[GRWTH Coach] LiveKit connection failed:', err);
+    alert("Couldn't connect to the practice call: " + err.message);
+    callActive = false;
+    clearInterval(callTimerInterval);
+    showView('setup');
+  } finally {
+    startBtn.disabled = false;
+  }
+}
+
+function updateCallTimer() {
+  const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('callTimer').textContent = m + ':' + s.toString().padStart(2, '0');
+}
+
+document.getElementById('muteBtn').addEventListener('click', async function () {
+  isMuted = !isMuted;
+  const btn = document.getElementById('muteBtn');
+  btn.classList.toggle('active', isMuted);
+  btn.textContent = isMuted ? 'Unmute' : 'Mute';
+  if (liveKitRoom) {
+    try { await liveKitRoom.localParticipant.setMicrophoneEnabled(!isMuted); } catch (_) {}
+  }
+});
+
+document.getElementById('endCallBtn').addEventListener('click', async function () {
+  const endBtn = document.getElementById('endCallBtn');
+  endBtn.disabled = true;
+  callActive = false;
+  clearInterval(callTimerInterval);
+  if (liveKitRoom) {
+    try { await liveKitRoom.disconnect(); } catch (_) {}
+    liveKitRoom = null;
+  }
+
+  const durationSec = Math.round((Date.now() - callStartTime) / 1000);
+
+  if (conversationHistory.length < 2) {
+    endBtn.disabled = false;
+    showView('setup');
+    return;
+  }
+
+  document.getElementById('scoringOverlay').style.display = 'flex';
+  try {
+    const result = await fetchJSON('/api/grwth-coach/roleplay/score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenario: selectedScenario,
+        difficulty: selectedDifficulty,
+        personality: selectedPersonality,
+        callType: selectedCallType,
+        transcript: conversationHistory,
+        durationSec: durationSec,
+      }),
+    });
+
+    renderScoreRing(result.score);
+    document.getElementById('scoreReaction').textContent = reactionForScore(result.score);
+    document.getElementById('topWinText').textContent = result.topWin || (result.strengths && result.strengths[0]) || 'Keep it up.';
+    document.getElementById('topGrowthText').textContent = result.topGrowth || (result.improvements && result.improvements[0]) || 'Keep practicing.';
+    document.getElementById('strengthsList').innerHTML = result.strengths.map(function(s) { return '<li>' + s + '</li>'; }).join('');
+    document.getElementById('improvementsList').innerHTML = result.improvements.map(function(s) { return '<li>' + s + '</li>'; }).join('');
+
+    const categoryLabels = {
+      foundations: 'Foundations', connecting_tone: 'Connecting & Tone', situation_questions: 'Situation Questions',
+      problem_awareness: 'Problem Awareness', consequence_questions: 'Consequence Questions',
+      solution_commitment: 'Solution & Commitment', objection_reframes: 'Objection Reframes', live_call_teardown: 'Live Call Teardown',
+    };
+    const notesEntries = Object.entries(result.categoryNotes || {});
+    document.getElementById('categoryGradeGrid').innerHTML = notesEntries.map(function(entry) {
+      const key = entry[0], data = entry[1] || {};
+      const letter = data.letter || '—';
+      const score = typeof data.score === 'number' ? data.score : 0;
+      const barColor = letter === 'A' ? 'var(--teal-500)' : letter === 'B' ? 'var(--amber-600)' : 'var(--rose-600)';
+      return '<div class="grade-chip" data-chip="' + key + '">' +
+        '<div class="grade-chip-top"><span class="grade-chip-name">' + (categoryLabels[key] || key) + '</span>' +
+        '<span class="grade-chip-letter ' + letter + '">' + letter + '</span></div>' +
+        '<div class="grade-chip-bar"><div class="grade-chip-bar-fill" style="width:' + score + '%;background:' + barColor + ';"></div></div>' +
+        '<div class="grade-chip-note">' + (data.note || '') + '</div>' +
+      '</div>';
+    }).join('');
+
+    document.querySelectorAll('.grade-chip').forEach(function(chip) {
+      chip.addEventListener('click', function () { chip.classList.toggle('expanded'); });
+    });
+
+    document.getElementById('scoringOverlay').style.display = 'none';
+    endBtn.disabled = false;
+    showView('scorecard');
+    loadHistory();
+  } catch (err) {
+    document.getElementById('scoringOverlay').style.display = 'none';
+    endBtn.disabled = false;
+    alert("Couldn't score this session: " + err.message);
+    showView('setup');
+  }
+});
+
+function reactionForScore(score) {
+  if (score >= 90) return 'Excellent Call! 🔥';
+  if (score >= 75) return 'Solid Progress';
+  if (score >= 60) return 'Getting There';
+  return "Let's Keep Practicing";
+}
+
+function renderScoreRing(score) {
+  const size = 140, stroke = 10, radius = (size - stroke) / 2, circumference = 2 * Math.PI * radius;
+  const color = score >= 90 ? '#14B8A6' : score >= 75 ? '#C08A2E' : '#D5493A';
+  const host = document.getElementById('scoreRing');
+  host.innerHTML =
+    '<svg viewBox="0 0 ' + size + ' ' + size + '">' +
+      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + radius + '" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="' + stroke + '"/>' +
+      '<circle id="scoreRingArc" cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + radius + '" fill="none" stroke="' + color + '" stroke-width="' + stroke + '" stroke-linecap="round" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + circumference + '"/>' +
+    '</svg>' +
+    '<div class="score-ring-value" id="scoreRingValue">0</div>';
+
+  const arc = document.getElementById('scoreRingArc');
+  const valueEl = document.getElementById('scoreRingValue');
+  const targetOffset = circumference - (score / 100) * circumference;
+
+  requestAnimationFrame(function () {
+    arc.style.transition = 'stroke-dashoffset 1s ease-out';
+    arc.style.strokeDashoffset = targetOffset;
+  });
+
+  const duration = 900, start = performance.now();
+  function tick(now) {
+    const progress = Math.min(1, (now - start) / duration);
+    valueEl.textContent = Math.round(progress * score);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+document.getElementById('startBtn').addEventListener('click', function() { startCall(); });
+
+function renderGenerateCTA(extraNote) {
+  document.getElementById('personalizedScenarioContent').innerHTML =
+    '<div style="font-family:var(--font-display);font-weight:700;font-size:17px;color:#fff;margin-bottom:6px;">Practice your own biggest gap</div>' +
+    '<div style="font-size:12.5px;color:rgba(255,255,255,0.65);line-height:1.5;margin-bottom:16px;max-width:420px;">Your coach picks the sub-skill you actually need work on and builds a scenario from a real moment in your own calls.' + (extraNote || '') + '</div>' +
+    '<button id="generatePersonalizedBtn" style="background:linear-gradient(135deg,var(--teal-400),var(--teal-600));color:#06110F;border:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:12.5px;">Generate My Scenario</button>';
+}
+
+var currentCallType = 'sales';
+
+function loadPersonalizedScenarios() {
+  fetchJSON('/api/grwth-coach/roleplay/personalized-scenarios?callType=' + currentCallType).then(function(scenarios) {
+    if (scenarios.length === 0) { renderGenerateCTA(); return; }
+    renderScenarioPicker(scenarios);
+  }).catch(function() {});
+}
+
+document.querySelectorAll('.rp-type-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    if (tab.dataset.type === currentCallType) return;
+    document.querySelectorAll('.rp-type-tab').forEach(function(t) {
+      t.classList.remove('active');
+      t.style.background = 'transparent';
+      t.style.color = '#6B7280';
+      t.style.boxShadow = 'none';
+    });
+    tab.classList.add('active');
+    tab.style.background = '#fff';
+    tab.style.color = '#0E1018';
+    tab.style.boxShadow = '0 1px 3px rgba(14,16,24,0.08)';
+    currentCallType = tab.dataset.type;
+    loadPersonalizedScenarios();
+  });
+});
+
+function renderScenarioPicker(scenarios) {
+  var listHtml = scenarios.map(function(s) {
+    return '<div data-start-scenario="' + s.id + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer;">' +
+      '<div>' +
+        '<div style="font-size:13px;font-weight:700;color:#fff;">' + s.scenarioTitle + '</div>' +
+        '<div style="font-size:11px;color:var(--teal-400);">Targets: ' + s.subSkillName + '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
+        '<button data-skip-scenario="' + s.id + '" title="Not right now — skip this one" style="background:none;border:none;padding:4px;color:rgba(255,255,255,0.4);">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+        '</button>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="15" height="15" style="color:rgba(255,255,255,0.5);"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('personalizedScenarioContent').innerHTML =
+    '<div style="font-family:var(--font-display);font-weight:700;font-size:17px;color:#fff;margin-bottom:12px;">' + scenarios.length + ' scenario' + (scenarios.length === 1 ? '' : 's') + ' ready for you</div>' +
+    listHtml +
+    '<button id="generateAnotherBtn" style="background:none;border:none;color:var(--teal-400);font-weight:700;font-size:12px;padding:6px 0;margin-top:4px;">+ Generate another</button>';
+}
+
+// Event delegation on the stable banner container — content inside it
+// gets replaced dynamically (empty CTA vs. multi-scenario list vs. a
+// freshly generated result), so binding directly to inner button IDs
+// would go stale the moment the content changes.
+document.getElementById('personalizedScenarioBanner').addEventListener('click', function(e) {
+  var generateBtn = e.target.closest('#generatePersonalizedBtn');
+  var generateAnotherBtn = e.target.closest('#generateAnotherBtn');
+  var startBtn = e.target.closest('#startPersonalizedBtn');
+  var skipBtn = e.target.closest('[data-skip-scenario]');
+  var pickerRow = e.target.closest('[data-start-scenario]');
+
+  if (skipBtn) {
+    fetchJSON('/api/grwth-coach/roleplay/personalized-scenarios/' + skipBtn.dataset.skipScenario, { method: 'DELETE' })
+      .then(function() { return fetchJSON('/api/grwth-coach/roleplay/personalized-scenarios?callType=' + currentCallType); })
+      .then(function(scenarios) {
+        if (scenarios.length === 0) { renderGenerateCTA(); } else { renderScenarioPicker(scenarios); }
+      })
+      .catch(function(err) { alert("Couldn't skip that scenario: " + err.message); });
+    return;
+  }
+  if (startBtn) {
+    startCall(startBtn.dataset.scenarioId);
+    return;
+  }
+  if (pickerRow) {
+    startCall(pickerRow.dataset.startScenario);
+    return;
+  }
+  if (generateBtn || generateAnotherBtn) {
+    var btn = generateBtn || generateAnotherBtn;
+    var originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Building your scenario\u2026';
+
+    fetchJSON('/api/grwth-coach/roleplay/generate-personalized-scenario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callType: currentCallType }),
+    }).then(function(result) {
+      document.getElementById('personalizedScenarioContent').innerHTML =
+        '<div style="font-family:var(--font-display);font-weight:700;font-size:17px;color:#fff;margin-bottom:6px;">' + result.scenarioTitle + '</div>' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--teal-400);margin-bottom:8px;">Targets: ' + result.subSkillName + '</div>' +
+        '<div style="font-size:12.5px;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:16px;max-width:440px;">' + result.personaDescription + '</div>' +
+        '<button id="startPersonalizedBtn" data-scenario-id="' + result.id + '" style="background:linear-gradient(135deg,var(--teal-400),var(--teal-600));color:#06110F;border:none;padding:10px 20px;border-radius:999px;font-weight:700;font-size:12.5px;">Start This Scenario</button>';
+    }).catch(function(err) {
+      renderGenerateCTA('<br><span style="color:#F5A19A;">Couldn\u2019t build a scenario: ' + err.message + '</span>');
+    });
+  }
+});
+
+// Safety net: if the browser still blocked audio despite the startAudio()
+// call above (Safari especially can be stubborn about this), any click
+// on the call screen retries it — this is a real, documented LiveKit
+// pattern for exactly this situation, not a guess.
+document.getElementById('callStage').addEventListener('click', function () {
+  if (liveKitRoom && !liveKitRoom.canPlaybackAudio) {
+    liveKitRoom.startAudio().catch(function (e) { console.warn('[GRWTH Coach] Retry startAudio failed:', e); });
+  }
+});
+document.getElementById('practiceAgainBtn').addEventListener('click', function () { showView('setup'); });
+</script>
+
+</body>
+</html>
