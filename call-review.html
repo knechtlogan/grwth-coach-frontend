@@ -1433,6 +1433,8 @@ async function fetchJSON(path, options = {}) {
     const err = new Error(body?.error || `API ${res.status} on ${path}`);
     err.status = res.status;
     err.entitlementBlocked = !!body?.entitlementBlocked;
+    err.reason = body?.reason || null;
+    err.recordingStatus = body?.recordingStatus || null;
     throw err;
   }
   return res.json();
@@ -1663,7 +1665,17 @@ async function loadLiveData() {
         }
       } catch (videoErr) {
         console.warn('[GRWTH Coach] Could not fetch fresh video URL:', videoErr.message);
-        document.getElementById('simPlayerControls').style.display = 'flex';
+        const controls = document.getElementById('simPlayerControls');
+        controls.style.display = 'flex';
+        const titleEl = controls.querySelector('div[style*="font-weight:600"]');
+        const subEl = controls.querySelector('div[style*="color:var(--ink-400)"]');
+        if (videoErr.reason === 'still_processing') {
+          if (titleEl) titleEl.textContent = 'Video is still processing';
+          if (subEl) subEl.textContent = "This can take a little while after a call ends. The transcript and scoring below are already real — check back here shortly for the video.";
+        } else {
+          if (titleEl) titleEl.textContent = 'No recording available for this call';
+          if (subEl) subEl.textContent = 'The transcript and scoring below are still real — just no video was captured or saved for this one.';
+        }
       }
     } else {
       document.getElementById('simPlayerControls').style.display = 'flex';
