@@ -85,6 +85,7 @@
   .email-gate button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--teal-500), var(--teal-700)); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; }
   .email-gate .error { color: var(--rose-600); font-size: 12.5px; margin-top: 10px; display: none; }
 </style>
+<script src="/config.js"></script>
 </head>
 <body>
 
@@ -99,7 +100,7 @@
 </div>
 
 <script>
-const API_BASE = 'https://api.grwthtech.com';
+const API_BASE = window.GRWTH_API_BASE || localStorage.getItem('grwth_api_base') || 'https://api.grwthtech.com';
 const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
 
 const CATEGORY_ORDER = ['Foundations', 'Connecting & Tone', 'Situation Questions', 'Problem Awareness', 'Consequence Questions', 'Solution & Commitment', 'Objection Reframes', 'Live Call Teardown'];
